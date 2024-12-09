@@ -1,0 +1,1 @@
+Working directory for new research on attributions of HDI fragments to Diderot.
