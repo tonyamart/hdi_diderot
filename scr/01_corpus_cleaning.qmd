@@ -1,0 +1,323 @@
+---
+title: "01_corpus_cleaning"
+format: html
+editor: visual
+---
+
+## load pckg & data
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+theme_set(theme_minimal())
+```
+
+Corpus
+
+```{r}
+f <- list.files(path = "../data/corpus/", full.names = TRUE)
+
+corpus <- tibble(
+  path = f,
+  title = str_extract(f, "//.*$"),
+  text = sapply(path, read_file)
+) %>% 
+  mutate(title = str_remove(title, "//|\\.txt"),
+         author = str_extract(title, "^.*?_"),
+         author = str_remove(author, "_$"))
+
+str(corpus)
+rm(f)
+```
+
+## Cleaning
+
+### pre-tokenisation: &, '
+
+```{r}
+# Detecting "&" before the "real" tokenization, otherwise it will be lost
+corpus_pretokenized <- corpus %>%
+  unnest_tokens(input = text, output = word, 
+                token = stringr::str_split, # split with stringr with spaces sep
+                pattern = " ")
+
+
+# cleaning
+corpus <- corpus_pretokenized %>%
+  # "&" is replaced by "et"
+  mutate(word = str_replace_all(word, "&", " et ")) %>%
+
+  # "'" is replaced by an empty space
+  mutate(word = str_replace_all(word, "'", " "),
+         word = str_replace_all(word , "’", " ")) %>%
+  
+  # Concatenate everything back in the column text. Between each word is a " "
+  group_by(title, author) %>%
+  mutate(text = paste(word, collapse = " ")) %>%
+    
+    
+  # deleting the column "word"
+  select(-word) %>%
+    
+  # deleting all rows which are doubled
+  distinct() %>%
+  
+  # Ungrouping to have a clean tibble
+  ungroup()
+    
+rm(corpus_pretokenized)
+```
+
+### tokenisation
+
+#### errors vector
+
+```{r}
+# Creating a vector which contains noise (1000mfw analysed)
+
+errors <- unlist( # unlist to have just a vector
+  strsplit( # split the string to elements
+    c("i e r sc p ii v o u z h g re in b k iii iv x i liv ï st é q tion eh pro ut vi ks fl ré sor er ah ie ft w ejl ch iii liv st iv esi vii tions entr em im ments ap ac as xiv mo ins vs ix viii eh ah loo efl ocr cft fc dç cr ia rr pr zr yz rc ge ejco ej xi xii ze ra zre pe tz xiii ar lully jetta bautru da hi ur bn nt fbn ct ejl eit ch aufi cc ji mr ose plu cs elt ft ic it ja jcs ô lien pa mé assem lib chap tom clt dc id if ij er gions difoit ea faifoit ie tre po ef fr re tion ibid mm ôc li ui tems sieur sçait tacit périsperme eftomach adion leureiro pareeque reli amans â ô ç î f m c j r google by digitized ment ion hyver ter us do i.i tou efr ri eil ex û fo tt ll ture af no co tr oa qn rai fem cl oi cer",
+      " "), # <- Add a closing double quote here
+    " "
+  )
+)
+
+head(errors)
+```
+
+Tokenisation & removal of error words
+
+```{r}
+# real tokenisation
+corpus_tokenized <- corpus %>%
+  unnest_tokens(input = text, output = word, token = "words") %>%
+  
+  # filter out all words which  appear in the error-vector
+  filter(!word %in% errors) %>%
+  
+  # remove all numbers  
+  filter(!str_detect(word, "\\d+")) %>%
+    
+  # find and replace frequent words with long-s problem
+  # this can be done smarter but not today
+  mutate( 
+    word = str_replace(word, "^fe$", "se"),
+    word = str_replace(word, "^fa$", "sa"),
+    word = str_replace(word, "^eft$", "est"),
+    word = str_replace(word, "^efl$", "est"),
+    word = str_replace(word, "^dé$", "de"),
+    word = str_replace(word, "^fon$", "son"),
+    word = str_replace(word, "^fes$", "ses"),
+    word = str_replace(word, "^fi$", "si"),
+    word = str_replace(word, "^ame$", "âme"),
+    word = str_replace(word, "^lés$", "les"),
+    word = str_replace(word, "^lé$", "le"),
+    word = str_replace(word, "^ainfi$", "ainsi"),
+    word = str_replace(word, "^efprit$", "esprit"),
+    word = str_replace(word, "^fans$", "sans"),
+    word = str_replace(word, "^efi$", "est"),
+    word = str_replace(word, "^eff$", "est"),
+    word = str_replace(word, "^fu$", "su"),
+    word = str_replace(word, "^lés$", "les"),
+    word = str_replace(word, "^foin$", "soin"),
+    word = str_replace(word, "^chofes$", "choses"),
+    word = str_replace(word, "^chofe$", "chose"),
+    word = str_replace(word, "^prefque$", "presque"),
+    word = str_replace(word, "^ufage$", "usage"),
+    word = str_replace(word, "^caufe$", "cause"),
+    word = str_replace(word, "^fera$", "sera"),
+    word = str_replace(word, "^fur$", "sur"),
+    word = str_replace(word, "^fang$", "sang"),
+    word = str_replace(word, "^hiftoire$", "histoire"),
+    word = str_replace(word, "^fage$", "sage"),
+    word = str_replace(word, "^foient$", "soient"),
+    word = str_replace(word, "^affurer$", "assurer"),
+    word = str_replace(word, "^efpece$", "espèce"),
+    word = str_replace(word, "^fondions$", "sondions"),
+    word = str_replace(word, "^tète$", "tête"),
+    word = str_replace(word, "^fera$", "sera"),
+    word = str_replace(word, "^feroit$", "seroit"),
+    word = str_replace(word, "^aufli$", "aussi"),
+    word = str_replace(word, "^vaiffeaux$", "vaisseaux"),
+    word = str_replace(word, "^connoître$", "connaître"),
+    word = str_replace(word, "^folides$", "solides"),
+    word = str_replace(word, "^raifon$", "raison"),
+    word = str_replace(word, "^fouvent$", "souvent"),
+    word = str_replace(word, "^plufieurs$", "plusieurs"),
+    word = str_replace(word, "^lorfqu$", "lorsqu"),
+    word = str_replace(word, "^caufe$", "cause"),
+    word = str_replace(word, "^auffi$", "aussi"),
+    word = str_replace(word, "^feule$", "seule"),
+    word = str_replace(word, "^efpéce$", "espéce"),
+    word = str_replace(word, "^connoît$", "connaît"),
+    word = str_replace(word, "^lorfque$", "lorsque"),
+    word = str_replace(word, "^claffe$", "classe"),
+    word = str_replace(word, "^claffes$", "classes"),
+    word = str_replace(word, "^caufes$", "causes"),
+    word = str_replace(word, "^inteftins$", "intestins"),
+    word = str_replace(word, "^feul$", "seul"),
+    word = str_replace(word, "^jufqu$", "jusqu"),
+    word = str_replace(word, "^perfonnes$", "personnes"),
+    word = str_replace(word, "^vifcère$", "viscère"),
+    word = str_replace(word, "^prefque$", "presque"),
+    word = str_replace(word, "^feulement$", "seulement"),
+    word = str_replace(word, "^foient$", "soient"),
+    word = str_replace(word, "^aftringentes$", "astringentes"),
+    word = str_replace(word, "^conféquent$", "conséquent"),
+    word = str_replace(word, "^fecours$", "secours"),
+    word = str_replace(word, "^férofité$", "sérosité"),
+    word = str_replace(word, "^produifent$", "produisent"),
+    word = str_replace(word, "^agiffent$", "agissent"),
+    word = str_replace(word, "^enfuite$", "ensuite"),
+    word = str_replace(word, "^infertion$", "insertion"),
+    word = str_replace(word, "^maffe$", "masse"),
+    word = str_replace(word, "^affez$", "assez"),
+    word = str_replace(word, "^lefquels$", "lesquels"),
+    word = str_replace(word, "^perfonne$", "personne"),
+    word = str_replace(word, "^piftil$", "pistil"),
+    word = str_replace(word, "^vaif$", "vais"),
+    word = str_replace(word, "^efprit$", "esprit"),
+    word = str_replace(word, "^chofes$", "choses"),
+    word = str_replace(word, "^feaux$", "seaux"),
+    word = str_replace(word, "^exifte$", "existe"),
+    word = str_replace(word, "^fuffit$", "suffit"),
+    word = str_replace(word, "^fymptômes$", "symptômes"),
+    word = str_replace(word, "^fuc$", "suc"),
+    word = str_replace(word, "^puiffe$", "puisse"),
+    word = str_replace(word, "^divifions$", "divisions"),
+    word = str_replace(word, "^fupport$", "support"),
+    word = str_replace(word, "^aflinité$", "affinité"),
+    word = str_replace(word, "^fécond$", "sécond"),
+    word = str_replace(word, "^néceffaire$", "nécessaire"),
+    word = str_replace(word, "^puifqu$", "puisqu"),
+    word = str_replace(word, "^conféquemment$", "conséquemment"),
+    word = str_replace(word, "^digeftions$", "digestions"),
+    word = str_replace(word, "^dofe$", "dose"),
+    word = str_replace(word, "^ferait$", "serait"),
+    word = str_replace(word, "^fentimens$", "sentimens"),
+    word = str_replace(word, "^efprits$", "esprits"),
+    word = str_replace(word, "^fens$", "sens"),
+    word = str_replace(word, "^fuprême$", "suprême"),
+    word = str_replace(word, "^foïent$", "soïent"),
+    word = str_replace(word, "^fubalternes$", "subalternes"),
+    word = str_replace(word, "^chofe$", "chose"),
+    word = str_replace(word, "^fuccès$", "succès"),
+    word = str_replace(word, "^foldats$", "soldats"),
+    word = str_replace(word, "^occafion$", "occasion"),
+    word = str_replace(word, "^efpagnols$", "espagnols"),
+    word = str_replace(word, "^maifon$", "maison"),
+    word = str_replace(word, "^monfieur$", "monsieur"),
+    word = str_replace(word, "^françoife$", "françoise"),
+    word = str_replace(word, "^difcours$", "discours"),
+    word = str_replace(word, "^difant$", "disant"),
+    word = str_replace(word, "^prife$", "prise"),
+    word = str_replace(word, "^entreprife$", "entreprise"),
+    word = str_replace(word, "^foldat$", "soldat"),
+    word = str_replace(word, "^fervir$", "servir"),
+    word = str_replace(word, "^befoin$", "besoin"),
+    word = str_replace(word, "^fociété$", "société"),
+    word = str_replace(word, "^dépenfer$", "dépenser"),
+    word = str_replace(word, "^juftice$", "justice"),
+    word = str_replace(word, "^poffible$", "possible"),
+    word = str_replace(word, "^difette$", "disette"),
+    word = str_replace(word, "^falaires$", "salaires"),
+    word = str_replace(word, "^efpece$", "espèce"),
+    word = str_replace(word, "^jufte$", "juste"),
+    word = str_replace(word, "^befoins$", "besoins"),
+    word = str_replace(word, "^nécejjairement$", "nésessairement"),
+    word = str_replace(word, "^raifons$", "raisons"),
+    word = str_replace(word, "^affurer$", "assurer"),
+    word = str_replace(word, "^fortie$", "sortie"),
+    word = str_replace(word, "^fimple$", "simple"),
+    word = str_replace(word, "^célébroit$", "célébrait"),
+    word = str_replace(word, "^difoit$", "disait"),
+    word = str_replace(word, "^philofophie$", "philosophie"),
+    word = str_replace(word, "^analyfe$", "analyse"),
+    word = str_replace(word, "^femble$", "semble"),
+    word = str_replace(word, "^fujet$", "sujet"),
+    word = str_replace(word, "^foleil$", "soleil"),
+    word = str_replace(word, "^refte$", "reste"),
+    word = str_replace(word, "^ plaifir$", "plaisir"),
+    word = str_replace(word, "^dif$", "dis"),
+    word = str_replace(word, "^fent$", "sent"),
+    word = str_replace(word, "^ble$", "blé"),
+    word = str_replace(word, "^oifeaux$", "oiseaux"),
+    word = str_replace(word, "^fciences$", "sciences"),
+    word = str_replace(word, "^aulli$", "aussi"),
+    word = str_replace(word, "^enfemble$", "ensemble"),
+    word = str_replace(word, "^fortir$", "sortir"),
+    word = str_replace(word, "^ainli$", "ainsi"),
+    word = str_replace(word, "^foir$", "soir"),
+    word = str_replace(word, "^fource$", "source"),
+    word = str_replace(word, "^feule$", "seule")
+    )
+
+corpus_tokenized %>% sample_n(5)
+```
+
+Save three versions: tokenized, merged back to texts, merged as 1000k chunks
+
+```{r}
+# simple tokenized 
+
+saveRDS(corpus_tokenized, file = "../data/corpus_tokenized.rds")
+```
+
+```{r}
+# full texts
+
+corpus_full <- corpus_tokenized %>% 
+  group_by(author, title) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup()
+
+saveRDS(corpus_full, file = "../data/corpus_full_texts.rds")
+```
+
+```{r}
+# 1 row = 1000 words chunk
+
+d <- corpus_tokenized %>% 
+  mutate(title = str_remove(title, "\\.txt$")) %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /1000)) %>% 
+  ungroup()
+
+# detect chunks which are too short
+x <- d %>% 
+  group_by(title, id_group) %>% 
+  count(title, id_group) %>% 
+  ungroup() %>% 
+  filter(n < 1000) %>% 
+  mutate(chunk_id = paste0(id_group, "__", title))
+
+chunks <- d %>% 
+  mutate(chunk_id = paste0(id_group, "__", title)) %>% 
+  # filter shorter chunks
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # merge texts for each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup()
+
+
+saveRDS(chunks, file = "../data/corpus_chunks.rds")
+
+
+# number of chunks by each author
+chunks %>% 
+  separate(col = chunk_id, into = c("chunk_id", "other"), sep = "__") %>% 
+  separate(col = other, into = c("author", "title"), sep = "_") %>% 
+  count(author, sort = T)
+```
+
+## 
