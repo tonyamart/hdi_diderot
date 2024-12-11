@@ -1,0 +1,189 @@
+---
+title: "02_corpus_preproc"
+format: html
+editor: visual
+---
+
+## Corpus preprocessing
+
+This notebook prepare data for its use with BDI package. Namely, it is used to:
+
+-   chunk *problems* into 1000-words chunks
+
+-   filter reference set to balance over-represented texts by major authors
+
+-   look into the words distribution in the corpus (in case there is some errors, e.g., as "et" left as "&" and not presented in the words frequencies
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+theme_set(theme_minimal())
+```
+
+## Problems
+
+Load data for texts to be attributed
+
+```{r}
+editions <- list.files(path = "../data/test_fragments/",
+                       pattern = "ed",
+                       full.names = T)
+
+editions
+```
+
+```{r}
+pencil_ink <- list.files(path = "../data/test_fragments/",
+                         pattern = "ink|pencil",
+                         full.names = T)
+
+p_ink <- tibble(
+  path = pencil_ink,
+  title = c("HDI_ink", "HDI_pencil"),
+  text = sapply(path, read_file)
+)
+
+str(p_ink)
+```
+
+```{r}
+# clean ' and search for &
+# remove "appeared|changed|unchanged"
+
+p_ink_tokens <- p_ink %>% 
+  # replace ' and - with \s
+  mutate(text_cln = str_replace_all(text, "'|-|_", " "),
+         # replace newlines
+         text_cln = str_replace_all(text_cln, "\\r\\n", "  "),
+         # lowercase
+         text_cln = sapply(text_cln, tolower)) %>% #str
+  # remove raw texts & paths
+  select(-text, -path) %>% 
+  rename(text = text_cln) %>% 
+  
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  
+  # remove working tags
+  filter(!word %in% c("appeared", "changed", "unchanged")) %>% 
+  # remove digits
+  filter(!str_detect(word, "^\\d*$")) 
+
+head(p_ink_tokens)
+```
+
+Create 1000-words chunks
+
+```{r}
+p_ink_chunks <- p_ink_tokens %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /1000)) %>% 
+  ungroup()
+
+head(p_ink_chunks)
+
+# remove chunks with less than 1000 words
+x <- p_ink_chunks %>% 
+  group_by(title, id_group) %>% 
+  count() %>% 
+  ungroup() %>% filter(n < 1000) %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) 
+
+x
+
+p_ink_chunks <- p_ink_chunks %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) %>% 
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # concat text in each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup()
+
+head(p_ink_chunks)
+
+# count number of chunks
+p_ink_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_id"), sep = "__") %>% 
+  count(title)
+
+rm(p_ink, p_ink_tokens)
+```
+
+Check text
+
+```{r}
+p_ink_chunks$text[3]
+```
+
+Create columns for BDI
+
+```{r}
+glimpse(p_ink_chunks)
+```
+
+```{r}
+p_ink_chunks <- p_ink_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_num"), sep = "__") %>% 
+  separate(col = title, into = c("author", "work"), sep = "_") 
+
+head(p_ink_chunks)
+```
+
+## Comparison set
+
+```{r}
+corpus <- readRDS("../data/corpus_chunks.rds")
+
+glimpse(corpus)
+
+# check random chunk
+corpus$text[sample(nrow(corpus), 1)]
+```
+
+```{r}
+raw_corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>% 
+  rbind(p_ink_chunks) 
+
+head(raw_corpus)
+```
+
+Select only 5 authors & 3 works for each
+
+```{r}
+unique(raw_corpus$author)
+
+short_corpus <- raw_corpus %>% 
+  filter(author %in% c("Diderot", "Deleyre", "dHolbach", "Naigeon", "Raynal", 
+                       "HDI")) %>% 
+  count(author, work, sort = T) %>% 
+  group_by(author) %>% 
+  slice_max(n = 3, order_by = n) %>% 
+  ungroup() %>% 
+  mutate(tag = paste0(author, "_", work))
+
+x <- raw_corpus %>% 
+  mutate(tag = paste0(author, "_", work)) %>% 
+  filter(tag %in% short_corpus$tag)
+
+others <- x %>% 
+  group_by(tag) %>% 
+  sample_n(17) %>% 
+  ungroup()  %>% 
+  filter(author != "HDI")
+
+# shorten hdi samples to 10
+# leave the else to 17
+
+# calculate freqs & normalise with L2
+```
+
+NB Pechmeja & Meister have 87 and 27 chunks, the rest \>160

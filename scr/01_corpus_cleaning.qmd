@@ -257,6 +257,8 @@ corpus_tokenized <- corpus %>%
 corpus_tokenized %>% sample_n(5)
 ```
 
+## Write rds files
+
 Save three versions: tokenized, merged back to texts, merged as 1000k chunks
 
 ```{r}
