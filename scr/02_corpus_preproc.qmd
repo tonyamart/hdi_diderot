@@ -18,6 +18,7 @@ This notebook prepare data for its use with BDI package. Namely, it is used to:
 library(tidyverse)
 library(tidytext)
 
+library(cowplot)
 theme_set(theme_minimal())
 ```
 
@@ -49,6 +50,8 @@ corpus <- corpus %>%
   
   # reorder columns
   select(work, author_label, author, chunk_num, tag, text) 
+
+head(corpus)
 ```
 
 Select Diderot texts as problems
@@ -66,44 +69,34 @@ diderot_quest %>%
   count(author, work)
 ```
 
-Remove all other Diderot II, reduce the corpus size overall
+Remove all other Diderot II, attach only the diderot_quest
 
 ```{r}
-# mean & median number of chunks in works in the coprus
-corpus %>% 
+# random two works from each author
+two_random_works <- corpus %>% 
   filter(author != "Diderot II") %>% 
-  count(author, work, sort = T) %>% 
-  summarise(mn = mean(n),
-            md = median(n))
+  group_by(author, work) %>% 
+  count(sort = T) %>% 
+  filter(n > 5) %>% 
+  ungroup() %>% 
+  group_by(author) %>% 
+  sample_n(2) %>% 
+  ungroup()
 
-# filter works with more than 44 chunks
-long_works <- corpus %>% 
-  filter(author != "Diderot II") %>% 
-  count(author, work, sort = T) %>% 
-  filter(n > 44)
+two_random_works
 
-# sample only 30 chunks from these
-long_works_s <- corpus %>% 
-  filter(author != "Diderot II") %>% 
-  filter(work %in% long_works$work) %>% 
-  group_by(work) %>% 
-  sample_n(30)
-
-long_works_s %>% count(author, work)
-
-# merge with the rest
 corpus_s <- corpus %>% 
+  # remove the rest of the didrot II
   filter(author != "Diderot II") %>% 
-  filter(!work %in% long_works$work) %>% 
-  rbind(long_works_s) %>% 
   
-  # attach Diderot II as well
+  # take smaller samples from each author
+  filter(work %in% c(two_random_works$work)) %>% 
+  
+  # attach 2 works with 10 chunks each
   rbind(diderot_quest)
 
 # check number of chunks for each author
-corpus_s %>% count(author, sort = T)
-
-rm(lbls, long_works, long_works_s)
+corpus_s %>% count(author, work, sort = F)
 ```
 
 Count & scale words
@@ -123,7 +116,7 @@ ranks <- corpus_s %>%
   mutate(rel_freq = (n / total) * 100 ) %>% 
   head(200)
 
-head(ranks, 100)
+head(ranks, 50)
 ranks$word
 ```
 
@@ -185,8 +178,10 @@ authors_freqs %>%
 
 Create a shorter sample (less authors) & scale word freqs
 
+L1 transformation (relative frequencies)
+
 ```{r}
-corpus_s %>% 
+rfreq <- corpus_s %>% 
   filter(author %in% c("Diderot", "Deleyre", "dHolbach", "Jussieu", "Raynal", 
                        "Diderot II")) %>% 
   unnest_tokens(input = text, output = word, token = "words") %>% 
@@ -194,7 +189,307 @@ corpus_s %>%
   group_by(tag) %>% 
   count(word, sort = T) %>% 
   ungroup() %>% 
-  pivot_wider(names_from = word, values_from = n, values_fill = 0)
+  mutate(rel_freq = n/1000 * 100) %>% 
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  left_join(lbls, by = "author") %>% 
+  select(work, author_label, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+# write.csv(rfreq, "test_diderotII_rfreq.csv")
+```
+
+L2 transformation (sum of squares)
+
+```{r}
+to_matrix <- corpus_s %>% 
+  filter(author %in% c("Diderot", "Deleyre", "dHolbach", "Jussieu", "Raynal", 
+                       "Diderot II")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(word %in% ranks$word) %>% 
+  group_by(tag) %>% 
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = word, values_from = n, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+# check
+to_matrix[1:5, 1:5]
+
+dim(to_matrix)
+```
+
+```{r}
+tags <- to_matrix[,1]
+
+values <- to_matrix[,-1]
+
+# values <- values[1:20, 1:20]
+
+mtrx <- as.matrix(values)
+
+dim(mtrx)
+
+mtrx[1:5, 1:5]
+```
+
+```{r}
+norm_vec <- function(x){ 
+                 sqrt(sum(x^2))
+            }
+
+# empty matrix # NB fill nrow accordingly to the n of chunks in the corpus!
+# B=matrix(nrow=406, ncol=200)
+
+B[1:5, 1:5]
+
+Euc.lenA <- c()
+
+A <-  mtrx
+
+A[1:5,1:5]
+
+dim(A)
+dim(B)
+
+
+for(n in 1:200){ 
+   Euc.lenA <- c(Euc.lenA, norm_vec(A[,n]))
+}
+
+for(j in 1:200){
+   B[,j]<- A[,j]/Euc.lenA[j]
+}
+
+B[1:5,1:5]
+
+tibb <- as.tibble(B)
+
+# attach words as colnames
+colnames(tibb) <- c(colnames(values))
+
+tibb[1:5, 1:5]
+
+# return rownames (chunks)
+l2_norm <- cbind(tags, tibb)
+
+l2_norm[1:5, 1:5]
+
+# attach metadata (sep columns)
+head(meta_cols)
+
+l2_norm_corpus <- meta_cols %>% left_join(l2_norm, by = "tag")
+
+l2_norm_corpus[1:5, 1:10]
+
+# write.csv(l2_norm_corpus, "test_diderotII_l2norm.csv")
+```
+
+## BDI results
+
+Unknown text: Diderot's II Pensées Philosophiques
+
+### Rel freqs
+
+#### Diderot
+
+```{r}
+ddrt <- read.csv("0_tests_diderot-ii/1_rf_pens_vs_ddrt.csv")
+
+x_long <- ddrt %>% pivot_longer(!X, names_to = "run", values_to = "bdi")
+
+head(x_long)
+
+x_long %>% 
+  ggplot(aes(x = bdi, group = run, colour = run)) + 
+  geom_density() + 
+  geom_vline(xintercept=0, lty = 2, colour = "black")
+```
+
+#### Diderot II
+
+```{r}
+ddrt_ii <- read.csv("0_tests_diderot-ii/1_rf_pens_vs_ddrt-ii.csv")
+
+x_long <- ddrt_ii %>% pivot_longer(!X, names_to = "run", values_to = "bdi")
+
+head(x_long)
+
+x_long %>% 
+  ggplot(aes(x = bdi, group = run, colour = run)) + 
+  geom_density() + 
+  geom_vline(xintercept=0, lty = 2, colour = "black")
+```
+
+#### Raynal
+
+```{r}
+r <- read.csv("0_tests_diderot-ii/1_rf_pens_vs_ray.csv")
+
+x_long <- r %>% pivot_longer(!X, names_to = "run", values_to = "bdi")
+
+head(x_long)
+
+x_long %>% 
+  ggplot(aes(x = bdi, group = run, colour = run)) + 
+  geom_density() + 
+  geom_vline(xintercept=0, lty = 2, colour = "black")
+```
+
+### L2 norm
+
+```{r}
+ddrt <- read.csv("0_tests_diderot-ii/2_l2_pens_vs_ddrt.csv")
+
+ddrt <- ddrt %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "diderot")
+
+
+################
+
+ddrt_ii <- read.csv("0_tests_diderot-ii/2_l2_pens_vs_ddrt-ii.csv")
+
+ddrt_ii <- ddrt_ii %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "diderot ii")
+
+#################
+
+r <- read.csv("0_tests_diderot-ii/2_l2_pens_vs_ray.csv")
+
+r <- r %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "raynal")
+
+#################
+
+j <- read.csv("0_tests_diderot-ii/2_l2_pens_vs_j.csv")
+
+j <- j %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "jussieu")
+
+# plot
+
+rbind(ddrt, ddrt_ii, r, j) %>% 
+  ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+  geom_density(alpha = 0.3) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  # geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "Pensées Philosophiques vs 4 authors")
+```
+
+```{r}
+x <- read.csv("0_tests_diderot-ii/test_diderotII_l2norm.csv")
+x %>% 
+  count(work, sort = T)
+```
+
+### Salon 1781
+
+```{r}
+ddrt <- read.csv("0_tests_diderot-ii/3_l2_salon1781_vs_ddrt.csv")
+
+ddrt <- ddrt %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "diderot")
+
+
+################
+
+ddrt_ii <- read.csv("0_tests_diderot-ii/3_l2_salon1781_vs_ddrt-ii.csv")
+
+ddrt_ii <- ddrt_ii %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "diderot ii")
+
+#################
+
+r <- read.csv("0_tests_diderot-ii/3_l2_salon1781_vs_ray.csv")
+
+r <- r %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "raynal")
+
+#################
+
+j <- read.csv("0_tests_diderot-ii/3_l2_salon1781_vs_j.csv")
+
+j <- j %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = "jussieu")
+
+#################
+
+# plot
+
+rbind(ddrt, ddrt_ii, r, j) %>% 
+  ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+  geom_density(alpha = 0.3) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  # geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "Diderot's Salon 1781 vs 4 authors")
+```
+
+### Deleyre
+
+```{r}
+fl <- list.files(path = "0_tests_diderot-ii/", pattern = "^4_", full.names = T)
+
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "0_tests_diderot-ii//4_l2_deleyre_vs_|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "Deleyre's Idees sur l'education vs 4 authors")
+```
+
+### Jussieu
+
+```{r}
+fl <- list.files(path = "0_tests_diderot-ii/", pattern = "^5_", full.names = T)
+
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "0_tests_diderot-ii//5_l2_jussieu_vs_|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "Jussieu's Notice Historique 1-6 (26 chunks) vs 6 authors")
 ```
 
 ## Problems

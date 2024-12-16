@@ -42,7 +42,7 @@ corpus_pretokenized <- corpus %>%
                 token = stringr::str_split, # split with stringr with spaces sep
                 pattern = " ")
 
-head(corpus_pretokenized)
+tail(corpus_pretokenized)
 
 # cleaning
 corpus <- corpus_pretokenized %>%
@@ -56,6 +56,10 @@ corpus <- corpus_pretokenized %>%
          
          # more noise to remove from inside words
          # to remove: _ .  ; : , 
+         word = str_replace_all(word, "_", " "),
+         word = str_replace_all(word, "\\.", " "),
+         word = str_replace_all(word, ";", " "),
+         word = str_replace_all(word, ":", " "),
          
          # lowercase
          word = tolower(word),
