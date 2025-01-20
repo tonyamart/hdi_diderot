@@ -1,0 +1,281 @@
+---
+title: "04_editions_tests"
+format: html
+editor: visual
+---
+
+## Testing data from different editions of HDI
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+theme_set(theme_minimal())
+```
+
+Load 1000 word chunks corpus
+
+```{r}
+corpus <- readRDS("../data/corpus_chunks.rds")
+glimpse(corpus)
+```
+
+Load problems: segments from HDI editions of 1770, 1774, and 1780.
+
+```{r}
+editions <- list.files(path = "../data/test_fragments/",
+                       pattern = "ed",
+                       full.names = T)
+
+editions
+
+editions <- tibble(
+  path = editions,
+  title = editions,
+  text = sapply(path, read_file)
+) %>% 
+  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+
+str(editions)
+```
+
+### Prep test data
+
+Some cleaning
+
+```{r}
+# clean ' and search for &
+# remove "appeared|changed|unchanged"
+
+ed_tokens <- editions %>% 
+  # replace ' and - with \s
+  mutate(text_cln = str_replace_all(text, "'|-|_", " "),
+         # replace newlines
+         text_cln = str_replace_all(text_cln, "\\r|\\n", "  "),
+         # lowercase
+         text_cln = sapply(text_cln, tolower)) %>% #str
+  # remove raw texts & paths
+  select(-text, -path) %>% 
+  rename(text = text_cln) %>% 
+  
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  
+  # remove working tags
+  filter(!word %in% c("appeared", "changed", "unchanged")) %>% 
+  # remove digits
+  filter(!str_detect(word, "^\\d*$")) 
+
+head(ed_tokens)
+```
+
+Create chunks
+
+```{r}
+ed_chunks <- ed_tokens %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /1000)) %>% 
+  ungroup()
+
+head(ed_chunks)
+
+# find chunks with less than 1000 words
+x <- ed_chunks %>% 
+  group_by(title, id_group) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n < 1000) %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) 
+
+x # small chunks
+
+ed_chunks <- ed_chunks %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) %>% 
+  # remove shorter chunks
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # concat text in each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup() %>% 
+  # rename chunks (_ to -)
+  mutate(chunk_id = str_replace_all(chunk_id, "_", "-"))
+
+head(ed_chunks)
+
+# count number of chunks
+ed_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_id"), sep = "--") %>% 
+  count(title)
+
+rm(editions, ed_tokens, x)
+```
+
+```{r}
+# check data
+ed_chunks$text[3]
+```
+
+Create columns for BDI test
+
+```{r}
+editions_chunks <- ed_chunks %>% 
+  separate(col = chunk_id, into = c("work", "chunk_num"), sep = "--") %>% 
+  mutate(author = "HDI") %>% 
+  select(work, chunk_num, author, text)
+
+head(editions_chunks)
+```
+
+Prepare reference set in the same way & attach problem sets
+
+```{r}
+raw_corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>% 
+  rbind(editions_chunks) %>% 
+  mutate(tag = paste0(chunk_num, "__", author, "_", work))
+
+head(raw_corpus)
+```
+
+### count freq & write data
+
+```{r}
+# editions groupings
+raw_corpus %>% 
+  filter(author == "HDI") %>% 
+  pull(work) %>% 
+  unique()
+
+# c("ed1770-nch1774-nch1780", "ed1770-CH1774-nch1780", "ed1770-nch1774-CH1780", "ed1770-CH1774-CH1780",  "ed1774-nch1780", "ed1774-CH1780", "ed1780" )
+```
+
+Number of chunks in each group
+
+```{r}
+raw_corpus %>% 
+  filter(author == "HDI") %>% 
+  group_by(work) %>% 
+  count()
+```
+
+#### ed1770-nch1774-nch1780
+
+Select problems chunks; calculate ranks & frequencies
+
+```{r}
+# remove other problems from the corpus
+x <- raw_corpus %>% 
+  filter(!work %in% c(# "ed1770-nch1774-nch1780", 
+                      # "ed1770-CH1774-nch1780", 
+                      "ed1770-nch1774-CH1780", 
+                      "ed1770-CH1774-CH1780",  
+                      "ed1774-nch1780", 
+                      "ed1774-CH1780", 
+                      "ed1780")) 
+
+###################### freqs
+
+# total words
+total <- x %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  nrow()
+
+# check ranks for the 200 MFW
+ranks <- x %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  count(word, sort = T) %>% 
+  mutate(rel_freq = (n / total) * 100 ) %>% 
+  head(200)
+
+head(ranks, 10)
+
+# use 100MFW
+mfw100 <- ranks$word[1:100]
+
+# calculate relative frequencies in each chunk
+rfreq <- x %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # filter 100 MFW
+  filter(word %in% mfw100) %>% 
+  # count words in each chunk
+  group_by(tag) %>% 
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  # calculate relative freq
+  mutate(rel_freq = n/1000 * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "04_tests/ed1770-nch-nch_1000_100mfw_rfreq.csv", 
+          row.names = F)
+```
+
+# Results
+
+#### ed1770-nch1774-nch1780
+
+11 chunks
+
+#### ed1770-CH1774-nch1780
+
+5 chunks
+
+#### ed1770-nch1774-CH1780
+
+18 chunks
+
+#### ed1770-CH1774-CH1780
+
+16 chunks
+
+#### ed1774-nch1780
+
+4 chunks
+
+#### ed1774-CH1780
+
+18 chunks
+
+#### ed1780
+
+86 chunks
+
+```{r}
+raw_corpus %>% 
+  filter(!work %in% c("ed1770-nch1774-nch1780", 
+                      "ed1770-CH1774-nch1780", 
+                      "ed1770-nch1774-CH1780", 
+                      "ed1770-CH1774-CH1780",  
+                      "ed1774-nch1780", 
+                      "ed1774-CH1780", 
+                      "ed1780" ))
+```
