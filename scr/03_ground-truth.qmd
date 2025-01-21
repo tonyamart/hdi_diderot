@@ -467,3 +467,536 @@ for (i in 1:length(unique(plot_data$author))) {
 }
 
 ```
+
+# FP1
+
+Testing the FP fragment known to be by Diderot
+
+### corpus prep
+
+Load data
+
+```{r}
+# taking FP and ed1774-nch as there should be at least two works of the presumable author
+fp1 <- list.files(path = "../data/test_fragments/",
+                       pattern = "FP|ed1774_nch", 
+                       full.names = T)
+
+fp1
+
+fp <- tibble(
+  path = fp1,
+  title = fp1,
+  text = sapply(path, read_file)
+) %>% 
+  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+
+str(fp)
+```
+
+Cleaning
+
+```{r}
+# clean ' and search for &
+# remove "appeared|changed|unchanged"
+
+fp_tokens <- fp %>% 
+  # replace ' and - with \s
+  mutate(text_cln = str_replace_all(text, "'|-|_", " "),
+         # replace newlines
+         text_cln = str_replace_all(text_cln, "\\r|\\n", "  "),
+         # lowercase
+         text_cln = sapply(text_cln, tolower)) %>% #str
+  # remove raw texts & paths
+  select(-text, -path) %>% 
+  rename(text = text_cln) %>% 
+  
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  
+  # remove working tags
+  filter(!word %in% c("appeared", "changed", "unchanged")) %>% 
+  # remove digits
+  filter(!str_detect(word, "^\\d*$")) 
+
+head(fp_tokens)
+```
+
+Create 1000 words chunks
+
+```{r}
+fp_chunks <- fp_tokens %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /1000)) %>% 
+  ungroup()
+
+head(fp_chunks)
+
+# find chunks with less than 1000 words
+x <- fp_chunks %>% 
+  group_by(title, id_group) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n < 1000) %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) 
+
+x # small chunks
+
+fp_chunks <- fp_chunks %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) %>% 
+  # remove shorter chunks
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # concat text in each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup() %>% 
+  # rename chunks (_ to -)
+  mutate(chunk_id = str_replace_all(chunk_id, "_", "-"))
+
+head(fp_chunks)
+
+# count number of chunks
+fp_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_id"), sep = "--") %>% 
+  count(title)
+
+rm(fp, fp1, fp_tokens, x)
+```
+
+Transform to BDI format
+
+```{r}
+fp1_chunks <- fp_chunks %>% 
+  separate(col = chunk_id, into = c("work", "chunk_num"), sep = "--") %>% 
+  mutate(author = "HDI") %>% 
+  select(work, chunk_num, author, text)
+
+head(fp1_chunks)
+```
+
+Prepare reference corpus and merge with FP data
+
+```{r}
+corpus <- readRDS("../data/corpus_chunks.rds")
+
+raw_corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>% 
+  # fix Diderot into one set
+  # filter(author != "Diderot II") %>% 
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  # merge
+  rbind(fp1_chunks) %>% 
+  mutate(tag = paste0(chunk_num, "__", author, "_", work))
+
+head(raw_corpus)
+
+raw_corpus %>% 
+  count(author, work, sort = T) 
+```
+
+### count freq
+
+```{r}
+# total words
+total <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  nrow()
+
+# check ranks for the 200 MFW
+ranks <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  count(word, sort = T) %>% 
+  mutate(rel_freq = (n / total) * 100 ) %>% 
+  head(250)
+
+head(ranks, 10)
+
+# set number of mfw
+# mfw <- ranks$word[1:100]
+mfw <- ranks$word[1:250]
+
+# calculate relative frequencies in each chunk
+rfreq <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # filter 100 MFW
+  filter(word %in% mfw) %>% 
+  # count words in each chunk
+  group_by(tag) %>% 
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  # calculate relative freq
+  mutate(rel_freq = n/1000 * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "03_tests/FP1_1000_250mfw_rfreq.csv", row.names = F)
+```
+
+### 2k words chunks
+
+```{r}
+# taking FP and ed1774-nch as there should be at least two works of the presumable author
+fp1 <- list.files(path = "../data/test_fragments/",
+                       pattern = "FP|ed1774_nch", 
+                       full.names = T)
+
+fp1
+
+fp <- tibble(
+  path = fp1,
+  title = fp1,
+  text = sapply(path, read_file)
+) %>% 
+  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+
+str(fp)
+
+# clean ' and search for &
+# remove "appeared|changed|unchanged"
+
+fp_tokens <- fp %>% 
+  # replace ' and - with \s
+  mutate(text_cln = str_replace_all(text, "'|-|_", " "),
+         # replace newlines
+         text_cln = str_replace_all(text_cln, "\\r|\\n", "  "),
+         # lowercase
+         text_cln = sapply(text_cln, tolower)) %>% #str
+  # remove raw texts & paths
+  select(-text, -path) %>% 
+  rename(text = text_cln) %>% 
+  
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  
+  # remove working tags
+  filter(!word %in% c("appeared", "changed", "unchanged")) %>% 
+  # remove digits
+  filter(!str_detect(word, "^\\d*$")) 
+
+head(fp_tokens)
+```
+
+Chunks
+
+```{r}
+fp_chunks <- fp_tokens %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /2000)) %>% 
+  ungroup()
+
+head(fp_chunks)
+
+# find chunks with less than 1000 words
+x <- fp_chunks %>% 
+  group_by(title, id_group) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n < 2000) %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) 
+
+x # small chunks
+
+fp_chunks <- fp_chunks %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) %>% 
+  # remove shorter chunks
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # concat text in each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup() %>% 
+  # rename chunks (_ to -)
+  mutate(chunk_id = str_replace_all(chunk_id, "_", "-"))
+
+head(fp_chunks)
+
+
+rm(fp, fp1, fp_tokens, x)
+
+# count number of chunks
+fp_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_id"), sep = "--") %>% 
+  count(title)
+```
+
+Transform to BDI form
+
+```{r}
+fp1_chunks <- fp_chunks %>% 
+  separate(col = chunk_id, into = c("work", "chunk_num"), sep = "--") %>% 
+  mutate(author = "HDI") %>% 
+  select(author, work, chunk_num, text) %>% 
+  mutate(tag = paste0(chunk_num, "__", author, "_", work))
+
+head(fp1_chunks)
+```
+
+Attach main data
+
+```{r}
+corpus <- readRDS("../data/corpus_chunks.rds")
+
+raw_corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>%
+  
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  
+  # recalculate chunks
+  mutate(chunk_num_2 = floor(as.numeric(chunk_num)/2)) %>% 
+  mutate(tag = paste0(chunk_num_2, "__", author, "_", work)) 
+
+# last 1k chunks (to be removed)
+x <- raw_corpus %>% 
+  group_by(tag) %>% 
+  count(chunk_num_2, sort = T) %>% 
+  filter(n < 2) %>% 
+  ungroup() %>% 
+  pull(tag)
+
+head(x)
+
+  
+# raw_corpus_2k <- raw_corpus %>% 
+#   filter(!tag %in% x) %>% 
+#   select(-chunk_num, -tag) %>% 
+#   rename(chunk_num = chunk_num_2) %>% 
+#   group_by(chunk_num) %>% 
+#   mutate(text = paste(text, collapse = " ")) %>%
+#   ungroup() %>% 
+#   distinct()
+#   
+# # merge fp & reference corpus
+# raw_corpus_2k <- raw_corpus_2k %>% 
+#   rbind(fp1_chunks) %>% 
+#   mutate(tag = paste0(chunk_num, "__", author, "_", work))
+# 
+# raw_corpus_2k %>% 
+#   count(author, work, sort = T) 
+
+raw_corpus <- raw_corpus %>% 
+  # remove chunks with less then 2k words
+  select(-chunk_num_2) %>% 
+  filter(!tag %in% x) %>% 
+  
+  # merge with fp1
+  rbind(fp1_chunks)
+  
+
+head(raw_corpus)
+```
+
+Count frequencies & write data
+
+```{r}
+# total words # 8923000
+total <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>%
+  nrow()
+
+# check ranks for the n MFW
+ranks <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  count(word, sort = T) %>% 
+  mutate(rel_freq = (n / total) * 100 ) %>% 
+  head(250)
+
+head(ranks, 10)
+
+# set number of mfw
+mfw <- ranks$word[1:250]
+
+# calculate relative frequencies in each chunk
+rfreq <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # filter MFW
+  filter(word %in% mfw) %>% 
+  # count words in each chunk
+  group_by(tag) %>% # in this case tag = 2 1000k chunks
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  # calculate relative freq
+  mutate(rel_freq = n/2000 * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "03_tests/FP1_2000_250mfw_rfreq.csv", row.names = F)
+```
+
+100 MFW
+
+```{r}
+# set number of mfw
+mfw <- ranks$word[1:100]
+
+# calculate relative frequencies in each chunk
+rfreq <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # filter MFW
+  filter(word %in% mfw) %>% 
+  # count words in each chunk
+  group_by(tag) %>% # in this case tag = 2 1000k chunks
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  # calculate relative freq
+  mutate(rel_freq = n/2000 * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "03_tests/FP1_2000_100mfw_rfreq.csv", row.names = F)
+```
+
+## Results
+
+### 1k
+
+```{r}
+# list csv results
+fl <- list.files(path = "03_tests/tests/fp1/", pattern = ".csv", full.names = T)
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors")
+
+ggsave(filename = "03_tests/tests/fp1_all.png", plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
+  filter(str_detect(group, "HDI|Diderot|Raynal")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors")
+```
+
+### 2k
+
+```{r}
+# list csv results
+fl <- list.files(path = "03_tests/tests/fp1/", pattern = ".csv", full.names = T)
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors (2k chunks, 100 MFW)")
+
+ggsave(filename = "03_tests/tests/fp1_2k_100MFW.png", plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
+  filter(str_detect(group, "HDI|Diderot|Raynal")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors")
+```
