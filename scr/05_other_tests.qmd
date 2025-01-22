@@ -1,0 +1,445 @@
+---
+title: "05_other_tests"
+format: html
+editor: visual
+---
+
+## Pencil / ink and selected fragments tests
+
+This notebooks prepares data and visualize results for Pensées détachées and Mélanges, as well as three selected fragments.
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+theme_set(theme_minimal())
+```
+
+### fn
+
+```{r}
+count_rfreq <- function(tbl, n_mfw, chunk_size) {
+    ###################### freqs
+  
+  # total words
+  total <- tbl %>% 
+    unnest_tokens(input = text, output = word, token = "words") %>% 
+    nrow()
+  
+  # check ranks for the 200 MFW
+  ranks <- tbl %>% 
+    unnest_tokens(input = text, output = word, token = "words") %>% 
+    count(word, sort = T) %>% 
+    mutate(rel_freq = (n / total) * 100 ) %>% 
+    head(250)
+  
+  # head(ranks, 10)
+  
+  # set MFW number
+  mfw <- ranks$word[1:n_mfw]
+  
+  # calculate relative frequencies in each chunk
+  rfreq <- t %>% 
+    unnest_tokens(input = text, output = word, token = "words") %>% 
+    # filter 100 MFW
+    filter(word %in% mfw) %>% 
+    # count words in each chunk
+    group_by(tag) %>% 
+    count(word, sort = T) %>% 
+    ungroup() %>% 
+    # calculate relative freq
+    mutate(rel_freq = (n/chunk_size) * 100) %>% 
+    # transform to wide matrix-like table
+    select(-n) %>% 
+    pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+    arrange(-desc(tag))
+  
+  # rfreq[1:5, 1:5]
+  
+  # dim(rfreq)
+  
+  #################### save
+  # extract metadata back as separate columns (from tag-merged freqs already!)
+  meta_cols <- rfreq %>% 
+    select(tag) %>% 
+    separate(remove = FALSE, col = tag, 
+             into = c("chunk_num", "othr"), sep = "__") %>% 
+    separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+    select(work, author, chunk_num, tag)
+  
+  # head(meta_cols)
+  
+  # attach metadata cols to word freqs
+  rfreq <- meta_cols %>% 
+    left_join(rfreq, by = "tag")
+  
+  # dim(rfreq)
+  
+  return(rfreq)
+}
+
+```
+
+Viz
+
+```{r}
+# make table ready for the ggplot from path=pth
+compile_res <- function(pth, ptrn) {
+  # list csv results
+  fl <- list.files(path = pth, 
+                   pattern = ptrn, full.names = T)
+  
+  new_data <- purrr::map_df(fl, function(x) {
+    mydata <- read.csv(x)
+    mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+    mutate(group = x)
+  })
+  
+  return(new_data)
+}
+
+# make plot
+mkplot <- function(plot_data, work) {
+  
+  plot_data %>% 
+    mutate(group = str_remove_all(group, "05_tests/tests//|\\.csv")) %>% 
+    ggplot(aes(x = bdi, group = run)) + 
+    geom_density(alpha = 0.15, fill = "darkgreen", colour = "black") + 
+    geom_vline(xintercept=0, lty = 2, colour = "black") + 
+    facet_wrap(~group, ncol=1) + 
+    theme(legend.position = "None") + 
+    labs(title = paste0(work, " vs various authors (2k chunks, 200 MFW)"))
+}
+
+# mkplot(x, "ed1770-CH-nch")
+
+# plot with selected authors
+mk_splot <- function(plot_data, work, authors) {
+  
+  plot_data %>% 
+    mutate(group = str_remove_all(group, "05_tests/tests//|\\.csv")) %>% 
+    filter(str_detect(group, authors)) %>% 
+    ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+    geom_density(alpha = 0.3) + 
+    geom_vline(xintercept=0, lty = 2, colour = "black") + 
+    #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+    facet_wrap(~group, ncol=1) + 
+    theme(legend.position = "None") + 
+    labs(title = paste0(work, " vs various authors (2k chunks, 200 MFW)"))
+}
+
+# e.g.:
+# mk_splot(x, work = "ed1770-CH-nch", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+### prep data
+
+#### problems
+
+prepare problems
+
+```{r}
+pr <- list.files(path = "../data/test_fragments/",
+                       pattern = "fr|ink|pencil",
+                       full.names = T)
+
+pr
+
+problems <- tibble(
+  path = pr,
+  title = pr,
+  text = sapply(path, read_file)
+) %>% 
+  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+
+str(problems)
+```
+
+Cleaning
+
+```{r}
+# clean ' and search for &
+# remove "appeared|changed|unchanged"
+
+pr_tokens <- problems %>% 
+  # replace ' and - with \s
+  mutate(text_cln = str_replace_all(text, "'|-|_", " "),
+         # replace newlines
+         text_cln = str_replace_all(text_cln, "\\r|\\n", "  "),
+         # lowercase
+         text_cln = sapply(text_cln, tolower)) %>% #str
+  # remove raw texts & paths
+  select(-text, -path) %>% 
+  rename(text = text_cln) %>% 
+  
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  
+  # remove working tags
+  filter(!word %in% c("appeared", "changed", "unchanged")) %>% 
+  # remove digits
+  filter(!str_detect(word, "^\\d*$")) 
+
+head(pr_tokens)
+```
+
+Create 2000 word chunks
+
+```{r}
+pr_chunks <- pr_tokens %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /2000)) %>% 
+  ungroup()
+
+head(pr_chunks)
+
+# find chunks with less than 1000 words
+x <- pr_chunks %>% 
+  group_by(title, id_group) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n < 2000) %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) 
+
+x # small chunks
+
+pr_chunks <- pr_chunks %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) %>% 
+  # remove shorter chunks
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # concat text in each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup() %>% 
+  # rename chunks (_ to -)
+  mutate(chunk_id = str_replace_all(chunk_id, "_", "-"))
+
+head(pr_chunks)
+
+# count number of chunks
+pr_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_id"), sep = "--") %>% 
+  count(title)
+
+rm(problems, pr_tokens, x)
+```
+
+Create columns for BDI test
+
+```{r}
+problems_chunks <- pr_chunks %>% 
+  separate(col = chunk_id, into = c("work", "chunk_num"), sep = "--") %>% 
+  mutate(author = "HDI") %>% 
+  mutate(tag = paste0(chunk_num, "__", author, "_", work)) %>% 
+  select(author, work, chunk_num, text, tag) 
+
+head(problems_chunks)
+```
+
+#### ref set
+
+```{r}
+corpus <- readRDS("../data/corpus_chunks.rds")
+
+# make 2k chunks
+corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>% 
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  
+  # recalculate chunks
+  mutate(chunk_num_2 = floor(as.numeric(chunk_num)/2)) %>% 
+  mutate(tag = paste0(chunk_num_2, "__", author, "_", work)) 
+
+# last 1k chunks (to be removed)
+x <- corpus %>% 
+  group_by(tag) %>% 
+  count(chunk_num_2, sort = T) %>% 
+  filter(n < 2) %>% 
+  ungroup() %>% 
+  pull(tag)
+
+head(x)
+
+raw_corpus <- corpus %>% 
+  # remove chunks with less then 2k words
+  select(-chunk_num_2) %>% 
+  filter(!tag %in% x) %>% 
+  mutate(chunk_num = str_extract(tag, "^\\d+"))
+  
+head(raw_corpus) # in this corpus each 2k chunk = 2 rows
+```
+
+Merge with problems
+
+```{r}
+raw_corpus <- raw_corpus %>% 
+  rbind(problems_chunks) 
+
+raw_corpus %>% 
+  filter(author == "HDI") %>% 
+  group_by(work) %>% 
+  count()
+
+raw_corpus %>% 
+  filter(author == "HDI") %>% 
+  select(work) %>% 
+  distinct() %>% 
+  pull()
+```
+
+### pencil
+
+```{r}
+# remove other problems from the corpus
+t <- raw_corpus %>% 
+  filter(!work %in% c(#"pencil-pensees-detachees",
+                      "ink-melanges",
+                      "fr-51-55-72-40",
+                      #"fr-on-russia-china",
+                      "fr-sauvage")) 
+
+pencil_rfreq <- count_rfreq(t, n_mfw = 200, chunk_size = 2000)
+
+pencil_rfreq[1:5,1:5]
+
+write.csv(pencil_rfreq, "05_tests/pencil_2k_200mfw_rfreq.csv", 
+          row.names = F)
+```
+
+### ink
+
+```{r}
+# remove other problems from the corpus
+t <- raw_corpus %>% 
+  filter(!work %in% c("pencil-pensees-detachees",
+                      #"ink-melanges",
+                      "fr-51-55-72-40",
+                      #"fr-on-russia-china",
+                      "fr-sauvage")) 
+
+ink_rfreq <- count_rfreq(t, n_mfw = 200, chunk_size = 2000)
+
+ink_rfreq[1:5,1:5]
+
+write.csv(ink_rfreq, "05_tests/ink_2k_200mfw_rfreq.csv", 
+          row.names = F)
+```
+
+### fr russia-china
+
+```{r}
+# remove other problems from the corpus
+t <- raw_corpus %>% 
+  filter(!work %in% c("pencil-pensees-detachees",
+                      "ink-melanges",
+                      #"fr-51-55-72-40",
+                      #"fr-on-russia-china",
+                      "fr-sauvage")) 
+
+rchina_rfreq <- count_rfreq(t, n_mfw = 200, chunk_size = 2000)
+
+rchina_rfreq[1:5,1:5]
+
+write.csv(rchina_rfreq, "05_tests/rchina_2k_200mfw_rfreq.csv", 
+          row.names = F)
+```
+
+### fr sauvage
+
+```{r}
+# remove other problems from the corpus
+t <- raw_corpus %>% 
+  filter(!work %in% c("pencil-pensees-detachees",
+                      "ink-melanges",
+                      #"fr-51-55-72-40",
+                      "fr-on-russia-china"#,
+                      #"fr-sauvage"
+                      )) 
+
+sauvage_rfreq <- count_rfreq(t, n_mfw = 200, chunk_size = 2000)
+
+sauvage_rfreq[1:5,1:5]
+
+write.csv(sauvage_rfreq, "05_tests/sauvage_2k_200mfw_rfreq.csv", 
+          row.names = F)
+```
+
+## Results
+
+### pencil
+
+45 chunks
+
+```{r}
+# gather data
+plt <- compile_res("05_tests/tests/", ptrn = "^pencil")
+
+# create and save plot with results for all authors
+mkplot(plt, "pencil")
+
+ggsave(filename = "05_tests/plots/pencil_2k_200MFW.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+# short version of the plot
+mk_splot(plt, work = "pencil", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+### ink
+
+```{r}
+# gather data
+plt <- compile_res("05_tests/tests/", ptrn = "^ink")
+
+# create and save plot with results for all authors
+mkplot(plt, "ink")
+
+ggsave(filename = "05_tests/plots/ink_2k_200MFW.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+# short version of the plot
+mk_splot(plt, work = "ink", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+### fr sauvage
+
+```{r}
+# gather data
+plt <- compile_res("05_tests/tests/", ptrn = "^sauvage")
+
+# create and save plot with results for all authors
+mkplot(plt, "sauvage")
+
+ggsave(filename = "05_tests/plots/sauvage_2k_200MFW.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+# short version of the plot
+mk_splot(plt, work = "sauvage", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+### fr russia-china
+
+```{r}
+# gather data
+plt <- compile_res("05_tests/tests/", ptrn = "^rchina")
+
+# create and save plot with results for all authors
+mkplot(plt, "rchina")
+
+ggsave(filename = "05_tests/plots/rchina_2k_200MFW.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+# short version of the plot
+mk_splot(plt, work = "rchina", authors = "HDI|Diderot|Raynal|dHolbach")
+```
