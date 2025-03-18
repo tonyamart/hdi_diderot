@@ -102,6 +102,15 @@ ed_tokens <- editions %>%
 head(ed_tokens)
 ```
 
+Number of words in each set (Table 2)
+
+```{r}
+glimpse(ed_tokens)
+
+ed_tokens %>% 
+  count(title, sort = F)
+```
+
 Create chunks – 2000 words
 
 ```{r}
@@ -518,6 +527,8 @@ write.csv(ed1774_CH_rfreq, "04_tests/ed1780_2k_200mfw_rfreq.csv",
 
 # Results
 
+### fn for plt
+
 ```{r}
 # make table ready for the ggplot from path=pth
 compile_res <- function(pth, ptrn) {
@@ -585,14 +596,24 @@ ggsave(filename = "04_tests/plots/ed1770-nch-nch_2k_200MFW.png",
 ```{r}
 plt %>% 
   mutate(group = str_remove_all(group, "04_tests/tests//|\\.csv")) %>% 
-  filter(str_detect(group, "HDI|Diderot|Raynal|dHolbach")) %>% 
-  ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
-  geom_density(alpha = 0.3) + 
+  filter(str_detect(group, "Diderot|Rivière|Condorcet|dHolbach|Saint-Lambert|Meister|Deleyre|Pechmeja|Baudeau")) %>% 
+  mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
+  geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  
+  scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
   #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
   facet_wrap(~group, ncol=1) + 
   theme(legend.position = "None") + 
-  labs(title = "ed1770-nch1774-nch1780 vs various authors (2k chunks, 200 MFW)")
+  labs(title = "FP vs selected authors",
+       y = "") + 
+  theme(strip.text = element_text(size = 12))
+
+ggsave("../../hdi_diderot/scr/plots_paper/fig_2-b.png",
+       plot = last_plot(), dpi = 300, bg = "white",
+       height = 8, width = 6)
 ```
 
 #### ed1770-CH1774-nch1780

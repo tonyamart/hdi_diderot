@@ -14,48 +14,53 @@ This notebook shows the preprocessing and visualisation of results obtained from
 library(tidyverse)
 library(tidytext)
 
+library(MetBrewer)
 theme_set(theme_minimal())
 ```
 
-To do
+## Authors to themselves
 
--   test all works with different settings
+This part of the notebook select 10 works by each author and use them to see how well BDI attribute the works to their authosr.
 
-    -   1000 words chunks
-
-        -   50 MFW
-
-        -   100 MFW
-
-        -   200 MFW
-
-### 1000 words chunks
+### 2000 words chunks
 
 ```{r}
-corpus <- readRDS("../data/corpus_chunks.rds")
+corpus <- readRDS("../data/bdi/corpus_chunks.rds")
 
 glimpse(corpus)
 ```
 
+Reorganize to 2000-words chunks
+
 ```{r}
 corpus <- corpus %>% 
-  # important: unite Diderot selections!
-  mutate(chunk_id = str_replace(chunk_id, "Diderot II", "Diderot")) %>% 
-  
-  mutate(tag = chunk_id) %>% # separate columns into work, etc.
   separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
   separate(title, into = c("author", "work"), sep = "_") %>% 
-  # reorder columns
-  select(work, author, chunk_num, tag, text) 
+  select(author, work, chunk_num, text) %>% 
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
   
+  # recalculate chunks
+  mutate(chunk_num_2 = floor(as.numeric(chunk_num)/2)) %>% 
+  mutate(tag = paste0(chunk_num_2, "__", author, "_", work)) 
 
-head(corpus)
-```
+# last 1k chunks (to be removed, 79 chunks)
+x <- corpus %>% 
+  group_by(tag) %>% 
+  count(chunk_num_2, sort = T) %>% 
+  filter(n < 2) %>% 
+  ungroup() %>% 
+  pull(tag)
 
-Count number of authors and works
+head(x)
 
-```{r}
-corpus %>% count(author, sort = T) # 18 authors
+corpus <- corpus %>% 
+  # remove chunks with less then 2k words
+  select(-chunk_num_2) %>% 
+  filter(!tag %in% x) %>% 
+  mutate(chunk_num = str_extract(tag, "^\\d+"))
+  
+head(corpus) # in this corpus each 2k chunk = 2 rows
 ```
 
 Number of works by author
@@ -67,7 +72,7 @@ corpus %>%
   count(sort = T)
 ```
 
-Select 10 random works from more presented authors
+Select 8 random works from more presented authors
 
 ```{r}
 a <- corpus %>% 
@@ -138,24 +143,18 @@ ranks <- corpus_s %>%
 head(ranks, 10)
 ```
 
-#### 50 MFW
+#### 200 MFW 
 
-```{r}
-mfw50 <- ranks$word[1:50]
-
-mfw50
-```
-
-Extract the word frequencies and do L1 transformation
+Calculate relative frequencies (L1) of 200 MFW in each chunk
 
 ```{r}
 rfreq <- corpus_s %>% 
   unnest_tokens(input = text, output = word, token = "words") %>% 
-  filter(word %in% mfw50) %>% 
+  filter(word %in% ranks$word) %>% 
   group_by(tag) %>% 
   count(word, sort = T) %>% 
   ungroup() %>% 
-  mutate(rel_freq = n/1000 * 100) %>% 
+  mutate(rel_freq = n/2000 * 100) %>% 
   select(-n) %>% 
   pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
   arrange(-desc(tag))
@@ -179,231 +178,21 @@ rfreq <- meta_cols %>%
 
 dim(rfreq)
 
-write.csv(rfreq, "03_tests/test_1000_50mfw_rfreq.csv", row.names = F)
+write.csv(rfreq, "03_tests/authors_themselves/to-test_2000_200mfw_rfreq.csv", 
+          row.names = F)
 ```
 
-#### 100 MFW
+#### Experiment summary
 
-```{r}
-mfw100 <- ranks$word[1:100]
+In the `03_ground_truth.ipynb` each work by each author is taken as a problem (not all works tested, only selected above). For each work the BDI results against the true author are recorded.
 
-mfw100
-```
-
-```{r}
-rfreq <- corpus_s %>% 
-  unnest_tokens(input = text, output = word, token = "words") %>% 
-  filter(word %in% mfw100) %>% 
-  group_by(tag) %>% 
-  count(word, sort = T) %>% 
-  ungroup() %>% 
-  mutate(rel_freq = n/1000 * 100) %>% 
-  select(-n) %>% 
-  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
-  arrange(-desc(tag))
-
-rfreq[1:5, 1:5]
-
-dim(rfreq)
-
-# extract metadata back as separate columns
-meta_cols <- rfreq %>% 
-  select(tag) %>% 
-  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
-  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
-  select(work, author, chunk_num, tag)
-
-head(meta_cols)
-
-# attach metadata cols to word freqs
-rfreq <- meta_cols %>% 
-  left_join(rfreq, by = "tag")
-
-dim(rfreq)
-
-# write.csv(rfreq, "03_tests/test_1000_100mfw_rfreq.csv", row.names = F)
-```
-
-#### 200 MFW
-
-```{r}
-mfw200 <- ranks$word[1:200]
-
-mfw200
-```
-
-```{r}
-rfreq <- corpus_s %>% 
-  unnest_tokens(input = text, output = word, token = "words") %>% 
-  filter(word %in% mfw200) %>% 
-  group_by(tag) %>% 
-  count(word, sort = T) %>% 
-  ungroup() %>% 
-  mutate(rel_freq = n/1000 * 100) %>% 
-  select(-n) %>% 
-  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
-  arrange(-desc(tag))
-
-rfreq[1:5, 1:5]
-
-dim(rfreq)
-
-# extract metadata back as separate columns
-meta_cols <- rfreq %>% 
-  select(tag) %>% 
-  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
-  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
-  select(work, author, chunk_num, tag)
-
-head(meta_cols)
-
-# attach metadata cols to word freqs
-rfreq <- meta_cols %>% 
-  left_join(rfreq, by = "tag")
-
-dim(rfreq)
-
-write.csv(rfreq, "03_tests/test_1000_200mfw_rfreq.csv", row.names = F)
-```
-
-## Experiment summary
-
-In the 03_ground_truth.ipynb each work by each author is taken as a problem (not all works tested, only selected above). For each work the BDI results against the true author are recorded.
-
-## Viz
+#### Viz
 
 Taking the results from the BDI runs and look into the distributions. The plots are stored in a separate folder, with 1 plot = 1 author.
 
 ```{r}
-fl <- list.files(path = "03_tests/tests/ch1000/mfw50/", full.names = T)
-
-new_data <- purrr::map_df(fl, function(x) {
-  mydata <- read.csv(x)
-  mydata %>% pivot_longer(!X, names_to = "chunk", values_to = "bdi") %>% 
-  mutate(group = x)
-})
-
-n_chunks <- meta_cols %>% 
-  mutate(group = paste0(author, "_", work)) %>% 
-  count(group, sort = T)
-
-plot_data <- new_data %>% 
-  mutate(group = str_remove_all(group, "03_tests/tests/ch1000/mfw50//|\\.csv"),
-         author = str_extract(group, "[^_]*")) %>% 
-  left_join(n_chunks, by = "group") %>% 
-  mutate(group = paste0(group, " (n chunks: ", n, ")")) 
-
-means <- plot_data %>% 
-  group_by(run) %>% 
-  summarise(mean_chunk = mean(bdi)) %>% 
-  ungroup() %>% 
-  left_join(plot_data %>% select(author, group, run), by = "run")
-
-
-for (i in 1:length(unique(plot_data$author))) {
-  a = unique(plot_data$author)[i]
-  fh = paste0("03_tests/tests/ch1000/plots50/", a, ".png")
-  
-  plot_data %>% 
-    filter(author == a) %>% 
-    ggplot(aes(x = bdi,  
-             # colour = author, 
-             # fill = author,
-             group = group)) + 
-  geom_density(alpha = 0.05, color = "darkgreen", fill = "darkgreen") + 
-  
-  geom_point(data = means %>% filter(author == a),
-             aes(x = mean_chunk, 
-                 y = -1), 
-             shape = 8, color = "darkgreen") + 
-  
-  geom_vline(xintercept=0, lty = 2, colour = "black") + 
-  facet_wrap(~group, ncol = 1) + 
-  theme(legend.position = "None") + 
-  labs(title = "Work tested against its author")
-  
-  ggsave(filename = fh,
-       plot = last_plot(),
-       width = 8, height = 10, 
-       bg = "white", dpi = 300)
-}
-
-
-```
-
-100 MFW
-
-```{r}
-fl <- list.files(path = "03_tests/tests/ch1000/mfw100/", full.names = T)
-
-new_data <- purrr::map_df(fl, function(x) {
-  mydata <- read.csv(x)
-  mydata %>% pivot_longer(!X, names_to = "chunk", values_to = "bdi") %>% 
-  mutate(group = x)
-})
-
-# count number of chunks for plot labels
-n_chunks <- new_data %>% 
-  mutate(group = str_remove_all(group, 
-                                "03_tests/tests/ch1000/mfw100//|\\.csv")) %>% 
-  count(group, sort = T) %>% 
-  mutate(n = n/1000)
-
-plot_data <- new_data %>% 
-  mutate(group = str_remove_all(group, 
-                                "03_tests/tests/ch1000/mfw100//|\\.csv"),
-         author = str_extract(group, "[^_]*")) %>% 
-  left_join(n_chunks, by = "group") %>% 
-  mutate(group = paste0(group, " (n chunks: ", n, ")")) 
-
-# calculate means
-means <- plot_data %>% 
-  group_by(chunk) %>% 
-  summarise(mean_chunk = mean(bdi)) %>% 
-  ungroup() %>% 
-  left_join(plot_data %>% select(author, group, chunk), by = "chunk") %>% 
-  distinct()
-
-means
-
-a = NULL
-
-for (i in 1:length(unique(plot_data$author))) {
-  a = unique(plot_data$author)[i]
-  fh = paste0("03_tests/tests/ch1000/plots100/", a, ".png")
-  
-  plot_data %>% 
-    filter(author == a) %>% 
-    ggplot(aes(x = bdi,  
-             # colour = author, 
-             # fill = author,
-             group = group)) + 
-  geom_density(alpha = 0.05, color = "darkgreen", fill = "darkgreen") + 
-  
-  geom_point(data = means %>% filter(author == a),
-             aes(x = mean_chunk, 
-                 y = -1), 
-             shape = 8, color = "darkgreen") + 
-  
-  geom_vline(xintercept=0, lty = 2, colour = "black") + 
-  facet_wrap(~group, ncol = 1) + 
-  theme(legend.position = "None") + 
-  labs(title = "Work tested against its author")
-  
-  ggsave(filename = fh,
-       plot = last_plot(),
-       width = 8, height = 10, 
-       bg = "white", dpi = 300)
-}
-
-
-```
-
-200 MFW
-
-```{r}
 # gather all results in csv
-fl <- list.files(path = "03_tests/tests/ch1000/mfw200/", full.names = T)
+fl <- list.files(path = "03_tests/authors_themselves/bdi_res/", full.names = T)
 
 # transform to long format for the plot
 new_data <- purrr::map_df(fl, function(x) {
@@ -415,13 +204,13 @@ new_data <- purrr::map_df(fl, function(x) {
 # count number of chunks for plot labels
 n_chunks <- new_data %>% 
   mutate(group = str_remove_all(group, 
-                                "03_tests/tests/ch1000/mfw200//|\\.csv")) %>% 
+                                "03_tests/authors_themselves/bdi_res//|\\.csv")) %>% 
   count(group, sort = T) %>% 
   mutate(n = n/1000)
 
 plot_data <- new_data %>% 
   mutate(group = str_remove_all(group, 
-                                "03_tests/tests/ch1000/mfw200//|\\.csv"),
+                                "03_tests/authors_themselves/bdi_res//|\\.csv"),
          author = str_extract(group, "[^_]*")) %>% 
   left_join(n_chunks, by = "group") %>% 
   mutate(group = paste0(group, " (n chunks: ", n, ")")) 
@@ -440,7 +229,7 @@ a = NULL
 
 for (i in 1:length(unique(plot_data$author))) {
   a = unique(plot_data$author)[i]
-  fh = paste0("03_tests/tests/ch1000/plots200/", a, ".png")
+  fh = paste0("03_tests/authors_themselves/plots/", a, ".png")
   
   plot_data %>% 
     filter(author == a) %>% 
@@ -466,6 +255,11 @@ for (i in 1:length(unique(plot_data$author))) {
        bg = "white", dpi = 300)
 }
 
+```
+
+```{r}
+# clean the env
+rm(list = ls())
 ```
 
 # FP1
@@ -521,6 +315,8 @@ fp_tokens <- fp %>%
 
 head(fp_tokens)
 ```
+
+### 1k chunks
 
 Create 1000 words chunks
 
@@ -582,7 +378,7 @@ head(fp1_chunks)
 Prepare reference corpus and merge with FP data
 
 ```{r}
-corpus <- readRDS("../data/corpus_chunks.rds")
+corpus <- readRDS("../data/bdi/corpus_chunks.rds")
 
 raw_corpus <- corpus %>% 
   separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
@@ -601,7 +397,7 @@ raw_corpus %>%
   count(author, work, sort = T) 
 ```
 
-### count freq
+Count word frequencies
 
 ```{r}
 # total words
@@ -614,19 +410,23 @@ ranks <- raw_corpus %>%
   unnest_tokens(input = text, output = word, token = "words") %>% 
   count(word, sort = T) %>% 
   mutate(rel_freq = (n / total) * 100 ) %>% 
-  head(250)
+  head(200) 
 
 head(ranks, 10)
 
 # set number of mfw
-# mfw <- ranks$word[1:100]
-mfw <- ranks$word[1:250]
+mfw100 <- ranks$word[1:100]
+mfw200 <- ranks$word[1:200]
+```
 
+100 MFW
+
+```{r}
 # calculate relative frequencies in each chunk
 rfreq <- raw_corpus %>% 
   unnest_tokens(input = text, output = word, token = "words") %>% 
   # filter 100 MFW
-  filter(word %in% mfw) %>% 
+  filter(word %in% mfw100) %>% 
   # count words in each chunk
   group_by(tag) %>% 
   count(word, sort = T) %>% 
@@ -658,7 +458,56 @@ rfreq <- meta_cols %>%
 
 dim(rfreq)
 
-write.csv(rfreq, "03_tests/FP1_1000_250mfw_rfreq.csv", row.names = F)
+write.csv(rfreq, "03_tests/fp1/1000_words/FP1_1000_100mfw_rfreq.csv", 
+          row.names = F)
+```
+
+200 MFW
+
+```{r}
+
+# calculate relative frequencies in each chunk
+rfreq <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # filter 100 MFW
+  filter(word %in% mfw200) %>% 
+  # count words in each chunk
+  group_by(tag) %>% 
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  # calculate relative freq
+  mutate(rel_freq = n/1000 * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "03_tests/fp1/1000_words/FP1_1000_200mfw_rfreq.csv", row.names = F)
+```
+
+```{r}
+# clean env
+rm(list = ls())
 ```
 
 ### 2k words chunks
@@ -666,7 +515,7 @@ write.csv(rfreq, "03_tests/FP1_1000_250mfw_rfreq.csv", row.names = F)
 ```{r}
 # taking FP and ed1774-nch as there should be at least two works of the presumable author
 fp1 <- list.files(path = "../data/test_fragments/",
-                       pattern = "FP|ed1774_nch", 
+                       pattern = "FP|ed1774_CH", 
                        full.names = T)
 
 fp1
@@ -767,7 +616,7 @@ head(fp1_chunks)
 Attach main data
 
 ```{r}
-corpus <- readRDS("../data/corpus_chunks.rds")
+corpus <- readRDS("../data/bdi/corpus_chunks.rds")
 
 raw_corpus <- corpus %>% 
   separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
@@ -777,7 +626,7 @@ raw_corpus <- corpus %>%
   # fix Diderot into one set
   mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
   
-  # recalculate chunks
+  # recalculate chunks to 2k
   mutate(chunk_num_2 = floor(as.numeric(chunk_num)/2)) %>% 
   mutate(tag = paste0(chunk_num_2, "__", author, "_", work)) 
 
@@ -790,24 +639,6 @@ x <- raw_corpus %>%
   pull(tag)
 
 head(x)
-
-  
-# raw_corpus_2k <- raw_corpus %>% 
-#   filter(!tag %in% x) %>% 
-#   select(-chunk_num, -tag) %>% 
-#   rename(chunk_num = chunk_num_2) %>% 
-#   group_by(chunk_num) %>% 
-#   mutate(text = paste(text, collapse = " ")) %>%
-#   ungroup() %>% 
-#   distinct()
-#   
-# # merge fp & reference corpus
-# raw_corpus_2k <- raw_corpus_2k %>% 
-#   rbind(fp1_chunks) %>% 
-#   mutate(tag = paste0(chunk_num, "__", author, "_", work))
-# 
-# raw_corpus_2k %>% 
-#   count(author, work, sort = T) 
 
 raw_corpus <- raw_corpus %>% 
   # remove chunks with less then 2k words
@@ -824,73 +655,33 @@ head(raw_corpus)
 Count frequencies & write data
 
 ```{r}
-# total words # 8923000
+# total words # 8 868 000
 total <- raw_corpus %>% 
   unnest_tokens(input = text, output = word, token = "words") %>%
   nrow()
 
-# check ranks for the n MFW
+# check ranks
 ranks <- raw_corpus %>% 
   unnest_tokens(input = text, output = word, token = "words") %>% 
   count(word, sort = T) %>% 
   mutate(rel_freq = (n / total) * 100 ) %>% 
-  head(250)
+  head(200) 
 
 head(ranks, 10)
 
 # set number of mfw
-mfw <- ranks$word[1:250]
-
-# calculate relative frequencies in each chunk
-rfreq <- raw_corpus %>% 
-  unnest_tokens(input = text, output = word, token = "words") %>% 
-  # filter MFW
-  filter(word %in% mfw) %>% 
-  # count words in each chunk
-  group_by(tag) %>% # in this case tag = 2 1000k chunks
-  count(word, sort = T) %>% 
-  ungroup() %>% 
-  # calculate relative freq
-  mutate(rel_freq = n/2000 * 100) %>% 
-  # transform to wide matrix-like table
-  select(-n) %>% 
-  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
-  arrange(-desc(tag))
-
-rfreq[1:5, 1:5]
-
-dim(rfreq)
-
-#################### save
-# extract metadata back as separate columns
-meta_cols <- rfreq %>% 
-  select(tag) %>% 
-  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
-  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
-  select(work, author, chunk_num, tag)
-
-head(meta_cols)
-
-# attach metadata cols to word freqs
-rfreq <- meta_cols %>% 
-  left_join(rfreq, by = "tag")
-
-dim(rfreq)
-
-write.csv(rfreq, "03_tests/FP1_2000_250mfw_rfreq.csv", row.names = F)
+mfw100 <- ranks$word[1:100]
+mfw200 <- ranks$word[1:200]
 ```
 
 100 MFW
 
 ```{r}
-# set number of mfw
-mfw <- ranks$word[1:100]
-
 # calculate relative frequencies in each chunk
 rfreq <- raw_corpus %>% 
   unnest_tokens(input = text, output = word, token = "words") %>% 
   # filter MFW
-  filter(word %in% mfw) %>% 
+  filter(word %in% mfw100) %>% 
   # count words in each chunk
   group_by(tag) %>% # in this case tag = 2 1000k chunks
   count(word, sort = T) %>% 
@@ -922,16 +713,67 @@ rfreq <- meta_cols %>%
 
 dim(rfreq)
 
-write.csv(rfreq, "03_tests/FP1_2000_100mfw_rfreq.csv", row.names = F)
+write.csv(rfreq, "03_tests/fp1/2000_words/FP1_2000_100mfw_rfreq.csv", 
+          row.names = F)
+```
+
+200 MFW
+
+```{r}
+# calculate relative frequencies in each chunk
+rfreq <- raw_corpus %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # filter MFW
+  filter(word %in% mfw200) %>% 
+  # count words in each chunk
+  group_by(tag) %>% # in this case tag = 2 1000k chunks
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  # calculate relative freq
+  mutate(rel_freq = n/2000 * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "03_tests/fp1/2000_words/FP1_2000_200mfw_rfreq.csv", row.names = F)
+```
+
+```{r}
+rm(list = ls())
 ```
 
 ## Results
 
+Output from ipynb notebook
+
 ### 1k
+
+100 mfw
 
 ```{r}
 # list csv results
-fl <- list.files(path = "03_tests/tests/fp1/", pattern = ".csv", full.names = T)
+fl <- list.files(path = "03_tests/fp1/1000_words/mfw100/", pattern = ".csv", full.names = T)
 
 new_data <- purrr::map_df(fl, function(x) {
   mydata <- read.csv(x)
@@ -940,21 +782,60 @@ new_data <- purrr::map_df(fl, function(x) {
 })
 
 new_data %>% 
-  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
+  mutate(group = str_remove_all(group, "03_tests/fp1/1000_words/mfw100//|\\.csv")) %>% 
   ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
   #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
   facet_wrap(~group, ncol=1) + 
   theme(legend.position = "None") + 
-  labs(title = "FP1 vs various authors")
+  labs(title = "FP1 vs various authors: 1000 chunks, 100 MFW")
 
-ggsave(filename = "03_tests/tests/fp1_all.png", plot = last_plot(),
+ggsave(filename = "03_tests/fp1/1000_words/fp1_1k_100mfw_all.png", 
+       plot = last_plot(),
        height = 20, width = 8, bg = "white")
 
 new_data %>% 
-  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
-  filter(str_detect(group, "HDI|Diderot|Raynal")) %>% 
+  mutate(group = str_remove_all(group, "03_tests/fp1/1000_words/mfw100//|\\.csv")) %>% 
+  filter(str_detect(group, "Baudeau|dHolbach|Diderot|Raynal")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors")
+```
+
+200 mfw
+
+```{r}
+# list csv results
+fl <- list.files(path = "03_tests/fp1/1000_words/mfw200/", pattern = ".csv", full.names = T)
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/fp1/1000_words/mfw200//|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors: 1000 chunks, 200 MFW")
+
+ggsave(filename = "03_tests/fp1/1000_words/fp1_1k_200mfw_all.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/fp1/1000_words/mfw200//|\\.csv")) %>% 
+  filter(str_detect(group, "Baudeau|dHolbach|Diderot|Raynal")) %>% 
   ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
@@ -966,9 +847,13 @@ new_data %>%
 
 ### 2k
 
+NB only 3 chunks
+
+100 mfw
+
 ```{r}
 # list csv results
-fl <- list.files(path = "03_tests/tests/fp1/", pattern = ".csv", full.names = T)
+fl <- list.files(path = "03_tests/fp1/2000_words/mfw100/", pattern = ".csv", full.names = T)
 
 new_data <- purrr::map_df(fl, function(x) {
   mydata <- read.csv(x)
@@ -977,7 +862,7 @@ new_data <- purrr::map_df(fl, function(x) {
 })
 
 new_data %>% 
-  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
+  mutate(group = str_remove_all(group, "03_tests/fp1/2000_words/mfw100//|\\.csv")) %>% 
   ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
@@ -986,17 +871,306 @@ new_data %>%
   theme(legend.position = "None") + 
   labs(title = "FP1 vs various authors (2k chunks, 100 MFW)")
 
-ggsave(filename = "03_tests/tests/fp1_2k_100MFW.png", plot = last_plot(),
+ggsave(filename = "03_tests/fp1/2000_words/fp1_2k_100MFW.png", plot = last_plot(),
        height = 20, width = 8, bg = "white")
 
+
 new_data %>% 
-  mutate(group = str_remove_all(group, "03_tests/tests/fp1//|\\.csv")) %>% 
-  filter(str_detect(group, "HDI|Diderot|Raynal")) %>% 
-  ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+  mutate(group = str_remove_all(group, "03_tests/fp1/2000_words/mfw100//|\\.csv")) %>% 
+  filter(str_detect(group, "Diderot|dHolbach|Condorcet|Deleyre|Raynal")) %>% 
+  mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  
+  scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP vs selected authors",
+       y = "") + 
+  theme(strip.text = element_text(size = 10))
+
+# ggsave("../../hdi_diderot/scr/plots_paper/fig_1-c.png",
+#        plot = last_plot(), dpi = 300, bg = "white",
+#        height = 5, width = 6)
+```
+
+200 mfw
+
+```{r}
+
+# list csv results
+fl <- list.files(path = "03_tests/fp1/2000_words/mfw200/", pattern = ".csv", full.names = T)
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/fp1/2000_words/mfw200//|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
   #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
   facet_wrap(~group, ncol=1) + 
   theme(legend.position = "None") + 
-  labs(title = "FP1 vs various authors")
+  labs(title = "FP1 vs various authors (2k chunks, 200 MFW)")
+
+ggsave(filename = "03_tests/fp1/2000_words/fp1_2k_200MFW.png", plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "03_tests/fp1/2000_words/mfw200//|\\.csv")) %>% 
+  filter(str_detect(group, "Diderot|dHolbach|Condorcet|Deleyre|Raynal")) %>% 
+  mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  
+  scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP vs selected authors (2000 words chunks, 200 MFW)",
+       y = "") + 
+  theme(strip.text = element_text(size = 10))
+
+ggsave("../../hdi_diderot/scr/plots_paper/fig_1-c.png",
+       plot = last_plot(), dpi = 300, bg = "white",
+       height = 5, width = 6)
+
+rm(list = ls())
+```
+
+# Known work vs all
+
+This part of the notebook test the method that will be used for the analysis on the known works of each author. Two works are taken for each author, then one is tested against the whole corpus, seeing which author will be selected by BDI as the closest.
+
+### data preparation
+
+Load the corpus
+
+```{r}
+corpus <- readRDS("../data/bdi/corpus_chunks.rds")
+glimpse(corpus)
+```
+
+Transform to 2000-word chunks
+
+```{r}
+corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>% 
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  
+  # recalculate chunks
+  mutate(chunk_num_2 = floor(as.numeric(chunk_num)/2)) %>% 
+  mutate(tag = paste0(chunk_num_2, "__", author, "_", work)) 
+
+# last 1k chunks (to be removed)
+x <- corpus %>% 
+  group_by(tag) %>% 
+  count(chunk_num_2, sort = T) %>% 
+  filter(n < 2) %>% 
+  ungroup() %>% 
+  pull(tag)
+
+head(x)
+
+raw_corpus <- corpus %>% 
+  # remove chunks with less then 2k words
+  select(-chunk_num_2) %>% 
+  filter(!tag %in% x) %>% 
+  mutate(chunk_num = str_extract(tag, "^\\d+"))
+  
+head(raw_corpus) # in this corpus each 2k chunk = 2 rows
+
+rm(x)
+```
+
+### downsampling
+
+Select only two works by each author
+
+```{r}
+works_s <- raw_corpus %>% 
+  group_by(author, work) %>% 
+  count(sort = T) %>% 
+  ungroup() %>%
+  group_by(author) %>% 
+  filter(n > 5 & n < 100) %>% 
+  sample_n(2) %>% 
+  ungroup() %>% 
+  select(-n) %>% 
+  mutate(tag_s = paste0(author, "__", work))
+
+works_s
+```
+
+Extract selected works
+
+```{r}
+corpus_s <- raw_corpus %>% 
+  mutate(tag = paste0(author, "__", work)) %>% 
+  filter(tag %in% works_s$tag_s) 
+
+# count number of chunks in selected works
+corpus_s %>% 
+  group_by(author, work) %>% 
+  count() %>% 
+  mutate(n = n/2) # 2000-word chunks
+```
+
+Downsample number of chunks to 20 or less
+
+```{r}
+
+glimpse(corpus_s)
+
+to_cut <- corpus_s %>% 
+  count(tag) %>% 
+  filter(n > 20) %>% 
+  pull(tag)
+
+# select randomply 20 chunks
+cutted <- corpus_s %>% 
+  filter(tag %in% to_cut) %>% 
+  group_by(tag) %>% 
+  sample_n(20) 
+
+# merge
+corpus_s <- corpus_s %>% 
+  # select only small works
+  filter(!tag %in% to_cut) %>% 
+  rbind(cutted) 
+```
+
+### count ranks & freqs
+
+```{r}
+# total words 
+total <- corpus_s %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  nrow()
+
+# check ranks for the 200 MFW
+ranks <- corpus_s %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  count(word, sort = T) %>% 
+  mutate(rel_freq = (n / total) * 100 ) %>% 
+  head(200)
+
+head(ranks, 10)
+
+# set MFW number
+mfw <- ranks$word[1:200]
+
+# calculate relative frequencies in each chunk
+rfreq <- corpus_s %>% 
+  mutate(tag = paste0(chunk_num, "__", author, "_", work)) %>% 
+  # select(author, work, chunk_num, text, tag) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # filter 100 MFW
+  filter(word %in% mfw) %>% 
+  # count words in each chunk
+  group_by(tag) %>% 
+  count(word, sort = T) %>% 
+  ungroup() %>% 
+  # calculate relative freq
+  mutate(rel_freq = n/2000 * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n) %>% 
+  pivot_wider(names_from = word, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq) 
+
+#################### save
+# extract metadata back as separate columns (from tag-merged freqs already!)
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, 
+           col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "03_tests/authors_vs_all/all_2works_2k_200mfw_rfreq.csv", 
+          row.names = F)
+```
+
+## Viz
+
+```{r}
+all_res <- list.files(path = "03_tests/authors_vs_all/runs/",
+                      full.names = TRUE)
+
+x <- tibble(path = all_res)
+
+x %>% 
+  mutate(path_cln = str_remove_all(path, 
+                                   "03_tests/authors_vs_all/runs//|\\.csv"),
+         true_author = str_extract(path_cln, "^(\\w+)"),
+         work = str_extract(path_cln, "-.*?_vs"),
+         work = str_remove_all(work, "-|_vs")
+         ) %>% 
+  select(path_cln, true_author, work)
+  
+
+# for each author: subset the table, 
+# extract the bdi results & reshape
+# then make a plot (colours -- works, highlight the author)
+# store plot for each author
+```
+
+```{r}
+# make table ready for the ggplot from path=pth
+compile_res <- function(pth, ptrn) {
+  # list csv results
+  fl <- list.files(path = pth, 
+                   pattern = ptrn, full.names = T)
+  
+  new_data <- purrr::map_df(fl, function(x) {
+    mydata <- read.csv(x)
+    mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+    mutate(group = x)
+  })
+  
+  return(new_data)
+}
+
+```
+
+```{r}
+plt <- compile_res("03_tests/authors_vs_all/runs/", ptrn = "^Baudeau")
+
+glimpse(plt)
+```
+
+```{r}
+plt %>% 
+    mutate(group = str_remove_all(group, "03_tests/authors_vs_all/runs//|\\.csv")) %>% 
+    ggplot(aes(x = bdi, group = run)) + 
+    geom_density(alpha = 0.15, fill = "darkgreen", colour = "black") + 
+    geom_vline(xintercept=0, lty = 2, colour = "black") + 
+    facet_wrap(~group, ncol=1) + 
+    theme(legend.position = "None") + 
+    labs(title = paste0("Baudeau-1 vs various authors (2k chunks, 200 MFW)"))
 ```

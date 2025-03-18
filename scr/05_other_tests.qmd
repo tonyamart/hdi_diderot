@@ -183,6 +183,13 @@ pr_tokens <- problems %>%
 head(pr_tokens)
 ```
 
+Count number of words in sets
+
+```{r}
+pr_tokens %>% 
+  count(title, sort = F)
+```
+
 Create 2000 word chunks
 
 ```{r}
@@ -407,7 +414,26 @@ ggsave(filename = "05_tests/plots/ink_2k_200MFW.png",
        height = 20, width = 8, bg = "white")
 
 # short version of the plot
-mk_splot(plt, work = "ink", authors = "HDI|Diderot|Raynal|dHolbach")
+plt %>% 
+  mutate(group = str_remove_all(group, "05_tests/tests//|\\.csv")) %>% 
+  filter(str_detect(group, "Diderot|Rivière|Condorcet|dHolbach|Saint-Lambert|Meister|Deleyre|Pechmeja|Baudeau")) %>% 
+  mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  
+  scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "Mélanges (ink) vs selected authors",
+       y = "") + 
+  theme(strip.text = element_text(size = 12))
+
+ggsave("../../hdi_diderot/scr/plots_paper/fig_3-b.png",
+       plot = last_plot(), dpi = 300, bg = "white",
+       height = 8, width = 6)
 ```
 
 ### fr sauvage
@@ -425,6 +451,29 @@ ggsave(filename = "05_tests/plots/sauvage_2k_200MFW.png",
 
 # short version of the plot
 mk_splot(plt, work = "sauvage", authors = "HDI|Diderot|Raynal|dHolbach")
+
+
+# short version of the plot
+plt %>% 
+  mutate(group = str_remove_all(group, "05_tests/tests//|\\.csv")) %>% 
+  filter(str_detect(group, "Diderot|Pechmeja|Morellet|Meister|Rivière|Condorcet|dHolbach|Saint-Lambert|Baudeau")) %>% 
+  mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  
+  scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "'Sauvage' fragment vs selected authors",
+       y = "") + 
+  theme(strip.text = element_text(size = 12))
+
+ggsave("../../hdi_diderot/scr/plots_paper/fig_4-b.png",
+       plot = last_plot(), dpi = 300, bg = "white",
+       height = 8, width = 6)
 ```
 
 ### fr russia-china

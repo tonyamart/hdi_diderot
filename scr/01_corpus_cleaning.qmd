@@ -15,6 +15,8 @@ theme_set(theme_minimal())
 
 Corpus
 
+Stored as corpus_raw.zip: a folder containing a single file for each work by each author.
+
 ```{r}
 f <- list.files(path = "../data/corpus/", full.names = TRUE)
 
@@ -344,4 +346,21 @@ chunks %>%
   count(author, sort = T)
 ```
 
-## 
+## N words & tokens by author
+
+```{r}
+corpus <- readRDS("../data/corpus_tokenized.rds")
+
+glimpse(corpus)
+
+n_works_by_author <- corpus %>% 
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  select(author, title) %>% 
+  distinct() %>% 
+  count(author, sort = F)
+
+n_words_by_author <- corpus %>% 
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  count(author, sort = F) %>% 
+  right_join(n_works_by_author, by = "author")
+```
