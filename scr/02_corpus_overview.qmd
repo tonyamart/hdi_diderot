@@ -1,0 +1,62 @@
+---
+title: "02_corpus_overview"
+format: html
+editor: visual
+---
+
+This notebook shows some corpus details, i.e. it search for potential biases in data caused by OCR.
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+theme_set(theme_minimal())
+library(MetBrewer)
+```
+
+## Load data
+
+```{r}
+corpus <- readRDS("../data/corpus_tokenized.rds")
+
+glimpse(corpus)
+```
+
+### N words by author
+
+```{r}
+corpus %>% 
+  group_by(author) %>% 
+  count(word, sort = T)
+```
+
+## works
+
+Group texts by works
+
+```{r}
+corpus_gr <- corpus %>% 
+  group_by(author, title) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup()
+
+glimpse(corpus_gr)
+```
+
+### frequencies check
+
+```{r}
+# fast check with 1000 words from a frequency list
+# https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/French_wordlist_opensubtitles_5000
+
+# load 1000 MFW
+mfw <- read.delim("../data/fr_mfw1000.tsv", sep = "\t") %>% 
+  select(-rank) %>% 
+  mutate(rank = row_number())
+
+glimpse(mfw)
+```
+
+try this list / list of MFW from the whole corpus
