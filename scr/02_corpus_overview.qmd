@@ -17,7 +17,8 @@ library(MetBrewer)
 ## Load data
 
 ```{r}
-corpus <- readRDS("../data/corpus_tokenized.rds")
+corpus <- readRDS("../data/corpus_tokenized.rds") %>% 
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) 
 
 glimpse(corpus)
 ```
@@ -25,24 +26,62 @@ glimpse(corpus)
 ### N words by author
 
 ```{r}
-corpus %>% 
+w_by_author <- corpus %>% 
   group_by(author) %>% 
-  count(word, sort = T)
+  count(sort = T) 
+
+w_by_author %>% 
+  mutate(lbl = paste0(floor(n/1000), "k")) %>% 
+  ggplot(aes(x = reorder_within(author, n, author), y = n)) + 
+  geom_col(width = 0.8, fill = "darkslategray") + 
+  labs(x = "Author", y = "Total N of words") + 
+  scale_x_reordered() + 
+  coord_flip() + 
+  geom_text(aes(label = lbl), 
+            vjust = 0.5, hjust = 1, 
+            size = 4, color = "gray") + 
+  theme(axis.text.x = element_text(angle = 90))
 ```
 
 ## works
 
-Group texts by works
+```{r}
+library(scales)
+
+w_by_work <- corpus %>% 
+  group_by(author, title) %>% 
+  count()
+
+glimpse(w_by_work)
+
+n_w_by_a <- w_by_work %>% 
+  ungroup() %>% 
+  count(author) %>% 
+  mutate(label = paste0(author, " (", n, ")"))
+
+w_by_work %>% 
+  left_join(n_w_by_a %>% select(-n), by = "author") %>% 
+  ggplot(aes(x = label, y = n)) + 
+  geom_jitter(color = "darkslategray", alpha = 0.5, width = 0.2) + 
+  geom_boxplot(width = 0.6, 
+               fill = "darkslategray4", color = "darkslategray",
+               alpha = 0.3,
+               outlier.shape = NA) +
+  scale_y_continuous(labels = label_comma(),
+                     breaks = c(0, 10000, 25000, 50000, 100000, 200000, 300000)) + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(y = "Number of words in each work", x = "Author (total number of works)", 
+       title = "Distribution of words in works by each author") + 
+  geom_hline(yintercept = 100000, lty = 2) + 
+  geom_hline(yintercept = 50000, lty = 2, color = "darkgreen") + 
+  geom_hline(yintercept = 25000, lty = 2, color = "darkred") + 
+  geom_hline(yintercept = 10000, lty = 2, color = "deeppink2")
+```
 
 ```{r}
-corpus_gr <- corpus %>% 
-  group_by(author, title) %>% 
-  mutate(text = paste(word, collapse = " ")) %>%
-  select(-word) %>%
-  distinct() %>%
-  ungroup()
-
-glimpse(corpus_gr)
+w_by_work %>% 
+  ungroup() %>% 
+  slice_max(n, n=5)
 ```
 
 ### frequencies check
@@ -60,3 +99,167 @@ glimpse(mfw)
 ```
 
 try this list / list of MFW from the whole corpus
+
+```{r}
+glimpse(corpus)
+
+d <- corpus %>% 
+  group_by(author, title) %>% 
+  distinct(word) %>% 
+  ungroup() %>% 
+  filter(word %in% mfw$word) %>% 
+  group_by(author, title) %>% 
+  count()
+
+glimpse(d)
+
+d %>% 
+  ungroup() %>% 
+  mutate(perc = n/1000 * 100) %>% 
+  ggplot(aes(x = author, y = perc)) + 
+  geom_jitter(color = "darkslategray", alpha = 0.5, width = 0.2) + 
+  geom_boxplot(width = 0.6, 
+               fill = "darkslategray4", color = "darkslategray",
+               alpha = 0.3,
+               outlier.shape = NA) + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(x = "",
+       y = "% our of 1000 MFW", 
+       title = "Percent of encountered MFW in each work",
+       subtitle = "Modern list of MFW")
+```
+
+Out of 200 MFW
+
+```{r}
+mfw200 <- mfw[1:200,]
+
+d <- corpus %>% 
+  group_by(author, title) %>% 
+  distinct(word) %>% 
+  ungroup() %>% 
+  filter(word %in% mfw200$word) %>% 
+  group_by(author, title) %>% 
+  count()
+
+glimpse(d)
+
+d %>% 
+  ungroup() %>% 
+  mutate(perc = n/200 * 100) %>% 
+  ggplot(aes(x = author, y = perc)) + 
+  geom_jitter(color = "darkslategray", alpha = 0.5, width = 0.2) + 
+  geom_boxplot(width = 0.6, 
+               fill = "darkslategray4", color = "darkslategray",
+               alpha = 0.3,
+               outlier.shape = NA) + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) + 
+  labs(x = "",
+       y = "% our of 200 MFW", 
+       title = "Percent of encountered 200MFW in each work",
+       subtitle = "Modern list of MFW") + 
+  geom_hline(yintercept = 0, color = "white") + 
+  geom_hline(yintercept = 60, color = "lightblue4", lty = 2)
+```
+
+```{r}
+d %>% 
+  ungroup() %>% 
+  slice_min(n, n = 20) %>% 
+  mutate(perc = n/200 * 100) %>% 
+  select(-n) %>% 
+  left_join(w_by_work %>% ungroup() %>%  select(-author), by = "title")
+```
+
+Same but with ranks from current corpus
+
+```{r}
+current_ranks <- corpus %>% 
+  count(word, sort = T) %>% 
+  head(1000)
+
+glimpse(current_ranks)
+```
+
+\% of 1000 MFW
+
+```{r}
+d <- corpus %>% 
+  group_by(author, title) %>% 
+  distinct(word) %>% 
+  ungroup() %>% 
+  filter(word %in% current_ranks$word) %>% 
+  group_by(author, title) %>% 
+  count()
+
+glimpse(d)
+
+d %>% 
+  ungroup() %>% 
+  mutate(perc = n/1000 * 100) %>% 
+  ggplot(aes(x = author, y = perc)) + 
+  geom_jitter(color = "darkslategray", alpha = 0.5, width = 0.2) + 
+  geom_boxplot(width = 0.6, 
+               fill = "darkslategray4", color = "darkslategray",
+               alpha = 0.3,
+               outlier.shape = NA) + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(x = "",
+       y = "% our of 1000 MFW", 
+       title = "Percent of encountered MFW in each work",
+       subtitle = "Corpus-based list of MFW") + 
+  geom_hline(yintercept = 0, color = "white")
+```
+
+```{r}
+d %>% 
+  ungroup() %>% 
+  slice_min(n, n = 20) %>% 
+  mutate(perc = n/1000 * 100) %>% 
+  select(-n) %>% 
+  left_join(w_by_work %>% ungroup() %>%  select(-author), by = "title")
+```
+
+200 MFW
+
+```{r}
+d <- corpus %>% 
+  group_by(author, title) %>% 
+  distinct(word) %>% 
+  ungroup() %>% 
+  filter(word %in% current_ranks$word[1:200]) %>% 
+  group_by(author, title) %>% 
+  count()
+
+glimpse(d)
+
+d %>% 
+  ungroup() %>% 
+  mutate(perc = n/200 * 100) %>% 
+  ggplot(aes(x = author, y = perc)) + 
+  geom_jitter(color = "darkslategray", alpha = 0.5, width = 0.2) + 
+  geom_boxplot(width = 0.6, 
+               fill = "darkslategray4", color = "darkslategray",
+               alpha = 0.3,
+               outlier.shape = NA) + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  scale_y_continuous(breaks = c(0, 25, 50, 75, 100)) + 
+  labs(x = "",
+       y = "% our of 200 MFW", 
+       title = "Percent of encountered 200MFW in each work",
+       subtitle = "Modern list of MFW") + 
+  geom_hline(yintercept = 0, color = "white") + 
+  geom_hline(yintercept = 60, color = "lightblue4", lty = 2)
+```
+
+Works with the least % of mfw
+
+```{r}
+d %>% 
+  ungroup() %>% 
+  slice_min(n, n = 20) %>% 
+  mutate(perc = n/200 * 100) %>% 
+  select(-n) %>% 
+  left_join(w_by_work %>% select(-author), by = "title")
+```
