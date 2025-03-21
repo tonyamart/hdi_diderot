@@ -1,0 +1,725 @@
+---
+title: "03_1_stylo-trees"
+format: html
+editor: visual
+---
+
+This notebook performs basic analysis with stylo() to overview the data.
+
+## Some data preparation & cleaning
+
+```{r, warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+library(tidyverse)
+library(tidytext)
+library(stylo)
+library(seetrees)
+library(tinytex)
+
+theme_set(theme_minimal())
+library(MetBrewer)
+```
+
+### load test fragments
+
+```{r, include=FALSE, echo=FALSE}
+# editions data
+
+l <- list.files(path = "../data/test_fragments/",
+                pattern = "^ed",
+                full.names = T)
+
+ed <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$"))
+
+head(ed)
+
+
+# pencil / ink data
+
+l <- list.files(path = "../data/test_fragments/",
+                pattern = "^ink|^pencil",
+                full.names = T
+                )
+
+ink_pencil <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$"))
+
+# likely Diderot's book chunks from FV recombination
+l <- list.files(path = "../data/test_fragments/",
+                pattern = "^fr",
+                full.names = T
+                )
+
+diderot <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$"))
+
+head(diderot)
+```
+
+Number of words in each test fragment
+
+```{r, include=T, echo=F}
+print("Number of words in different editions chunks:")
+ed %>% 
+  count(author, sort = T)
+
+print("Number of words in different Pensées detachées / Mélanges (pencil/ink) chunks:")
+ink_pencil %>% 
+  count(author, sort = T)
+
+print("Number of words in recombined likely-Diderots FV chunks:")
+diderot %>% 
+  count(author, sort = T)
+```
+
+### load corpus
+
+Test corpus is the same as before in Julian's latest tests.
+
+```{r, include=FALSE, echo=FALSE}
+corpus <- readRDS("../data/corpus_cln.Rds")
+
+unique(corpus$author)
+
+corpus_tokenized <- corpus %>% 
+  mutate(author = ifelse(author == "d", "dHolbach", author)) %>% 
+  # combine two Diderot's samples to one
+  # mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  # remove old texts in question
+  filter(!author %in% c("H-FP", "FP II (old version of FP)",
+                        "H-V-FP", "V-FP", "HDI(clean)",
+                        "Marmontel"))
+
+glimpse(corpus_tokenized)
+
+# total number of tokens by each author, two samples from Diderot
+corpus_tokenized %>% 
+  count(author, sort = T) 
+
+rm(corpus)
+```
+
+### fn
+
+Working functions
+
+#### sample ind opt
+
+```{r, include=FALSE, echo=FALSE}
+sample_independent_opt <- function(tokenized_df,
+  n_samples,
+  sample_size,
+  text_var = "word",
+  folder = "corpus_sampled/", overwrite=T) {
+
+
+  # create a folder
+  dir.create(folder)
+  
+  # rewrite all files in the folder if the folder existed before
+  if(overwrite) {
+    do.call(file.remove, list(list.files(folder, full.names = TRUE)))
+  }
+  
+  shuff <- tokenized_df %>%
+    group_by(author) %>%
+    sample_n(n_samples * sample_size) %>% # sample tokens
+    # to each sampled token assign randomly a sample number
+    mutate(sample_x = sample( # sample = reshuffle the numbers of samples repeated below
+    rep( # repeat
+      1:n_samples, # the numbers of samples (1, 2, 3...)
+      each = sample_size # each is sample_size times repeated
+      ))) %>%
+    # create a column author_sampleX
+    unite(sample_id, c(author, sample_x), remove = F) %>%
+    # group and paste together by sample_id (some kind of special paste with !!sym() )
+    group_by(sample_id) %>%
+    summarise(text = paste(!!sym(text_var), collapse = " "))
+    
+    # write samples
+    for(i in 1:nrow(shuff)) {
+    write_file(file=paste0(folder, shuff$sample_id[i],".txt"), shuff$text[i])
+  }
+}
+```
+
+#### diy stylo for imposters
+
+```{r, include=FALSE, echo=FALSE}
+diy_stylo <- function(folder = "corpus_sampled/",
+                      mfw = 200,
+                      drop_words = T,
+                      feature = "word",
+                      n_gram = 1) {
+  
+  # read the sampled texts from the folder corpus_sampled/
+  # the feature is either word or charaters
+  # the tokenizer returns lists of tokens for each text from the folder
+  tokenized.texts = load.corpus.and.parse(
+    files = list.files(folder, full.names = T),
+    features = feature,
+    ngram.size = n_gram
+  )
+  # computing a list of most frequent words (trimmed to top 2000 items):
+  features = make.frequency.list(tokenized.texts, head = 2000)
+  # producing a table of relative frequencies:
+  data = make.table.of.frequencies(tokenized.texts, features, relative = TRUE)#[,1:mfw]
+  
+  
+  
+  # --- cleaning ---
+  # remove stop words
+  str_dev_words <- c("changed")
+  s_words <- str_detect(colnames(data), str_dev_words) # output is a logical vector with the positions of the 
+  if(drop_words) {
+    data <- data[,!s_words]
+  }
+  # crop mfw
+  data <- data[, 1:mfw]
+  # clean document names
+  
+  rownames(data) <- str_remove_all(rownames(data), "corpus_sampled/") # Clean Rownammes
+  rownames(data) <- str_remove_all(rownames(data), "^.*?//") # clean rownames from full paths
+  
+  
+  # output
+  return(data)
+}
+```
+
+## Editions of 1770, 1774 & 1780
+
+Bind corpus & test fragments together.
+
+**DATA**
+
+The fragments were selected as follows:
+
+-   using the metadata compiled by Julian, there are three tags for each fragment
+
+    -   1770 edition: appeared / not appeared
+
+    -   1774 edition: appeared / not appeared / changed / not changed
+
+    -   1780 edition: appeared / changed / not changed
+
+-   consequently, all the fragments were divided into 7 groups:
+
+    -   appeared 1770 - not changed 1774 - not changed 1780
+
+    -   appeared 1770 - changed 1774 - not changed 1780
+
+    -   appeared 1770 - not changed 1774 - changed 1780
+
+    -   appeared 1770 - changed 1774 - changed 1780
+
+    -   appeared 1774 - not changed 1780
+
+    -   appeared 1774 - changed 1780
+
+    -   appeared 1780
+
+-   based on these criteria, the fragments were combined into one text file which is used for the analysis below as a test text.
+
+Below I will first look into the position of a test fragment on the stylo() tree, then impostors are used for a more robust results.
+
+```{r}
+ed_corpus <- rbind(corpus_tokenized, ed)
+```
+
+### stylo tests
+
+#### 1770 & unchanged in 1774 & 1780
+
+ed1770_nch1774_nch1780 : 11911 words
+
+```{r, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               #"ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780")),
+  n_samples = 2,
+  sample_size = 5000)
+```
+
+stylo tree
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+BCT
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+# bootstrap consensus tree
+bct <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  analyzed.features = "w",
+  ngram.size = 1,
+  mfw.min = 50,
+  mfw.max = 250,
+  mfw.incr = 1,
+  distance.measure = "wurzburg",
+  analysis.type = "BCT",
+  consensus.strength = 0.5
+)
+```
+
+The closest neighbor for text in question is d'Holbach. It is though too long distance to say that he is the author, more likely there is some genre/topic similarity.
+
+Some more trees below:
+
+#### 1770 & changed in 1774 , but not changed in 1780
+
+very small fragment: ed1770_CH1774_nch1780 - 5k words
+
+=\> likely random results
+
+```{r, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               #"ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780")),
+  n_samples = 2,
+  sample_size = 2500)
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+#### 1770, not changed 1774, changed 1780
+
+ed1770_nch1774_CH178: 18 247
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               #"ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780", 
+                                               "dHolbach")),
+  n_samples = 2,
+  sample_size = 4000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+#### 1770, changed twice in 1774 & 1780
+
+ed1770_CH1774_CH1780: 16 900 words
+
+```{r, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = ed_corpus %>% 
+                         filter(!author %in% c(#"ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780")),
+  n_samples = 2,
+  sample_size = 6000)
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+#### 1774, not changed in 1780
+
+ed1774_nch1780: 4 821 words
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               # "ed1774_nch1780", 
+                                               "ed1780")),
+  n_samples = 2,
+  sample_size = 2000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+# bootstrap consensus tree
+bct <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  analyzed.features = "w",
+  ngram.size = 1,
+  mfw.min = 50,
+  mfw.max = 250,
+  mfw.incr = 1,
+  distance.measure = "wurzburg",
+  analysis.type = "BCT",
+  consensus.strength = 0.5
+)
+```
+
+#### 1774 & changed in 1780
+
+ed1774_CH1780: 18 399 words
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               #"ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780")),
+  n_samples = 2,
+  sample_size = 6000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+#### 1780
+
+ed1780: 86 550
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780"#, 
+                                               #"ed1780"
+                                               )),
+  n_samples = 2,
+  sample_size = 10000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+#### check strongwords
+
+Check on a random tree if there is a strong bias in the main branches of the tree: seems fine.
+
+```{r, include=FALSE, echo=FALSE}
+view_tree(test1, k = 2)
+```
+
+### 
+
+## Check: d'Holbach writings separated
+
+Below I am taking d'Holbach's texts as separate files in order to check if there is one text which has a very strong signal that drives the similarity. It is also important to check if d'Holbach's authorial signal itself is strong and not diffused to other authors.
+
+```{r, include=FALSE, echo=FALSE}
+glimpse(ed_corpus)
+
+#unique(ed_corpus$title)
+
+t <- ed_corpus %>% 
+  mutate(author = ifelse(author == "dHolbach", title, author),
+         author = str_replace(author, "d_Holbach_", "dHolbach_"))
+
+t %>% 
+  count(author, sort = T) %>% tail
+
+t <- t %>% 
+  filter(!str_detect(author, "dHolbach_Essai") & 
+           !str_detect(author, "dHolbach_L_Antiquit"))
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = t %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               #"ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780"
+                                               )),
+  n_samples = 2,
+  sample_size = 4000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+```{r, include=T, echo=FALSE}
+dtm <- diy_stylo(
+  folder = "corpus_sampled/",
+  mfw = 200,
+  drop_words = F)
+
+grep("ed", rownames(dtm))
+
+imposters(reference.set = dtm[-c(53, 54), ],
+  test = dtm[53,],
+  features = 0.5,
+  iterations = 100,
+  distance = "wurzburg"
+)
+
+imposters(reference.set = dtm[-c(53, 54), ],
+  test = dtm[54,],
+  features = 0.5,
+  iterations = 100,
+  distance = "wurzburg"
+)
+```
+
+It seems that the corpus overall works fine and there is no actual issues with d'Holbach's set of works (at least I don't see it at the moment).
+
+## PART II. Pensées détachées vs Mélanges
+
+Or "pencil vs ink".
+
+The data is gathered using respective two columns from the metadata. All fragments marked as included to Pensées détachées or Mélanges are brought together in one file. These files are used for sampling and tests. An important difference from all other tests in this case is that both test samples here are quite large, i.e., the results might be more robust.
+
+```{r, include=FALSE, echo=FALSE}
+# select test texts from the corpus
+pencil_ink_corpus <- rbind(ink_pencil, corpus_tokenized)
+
+# unique(pencil_ink_corpus$author)
+# 
+# pencil_ink_corpus %>% 
+#   filter(author %in% c("ink_melanges", "pencil_pensees_detachees")) %>% 
+#   count(author)
+```
+
+### 
+
+### Stylo basic exploration
+
+take samples
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c(#"ink_melanges",
+                                               "pencil_pensees_detachees")),
+  n_samples = 2,
+  sample_size = 5000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c("ink_melanges"
+                                               #, "pencil_pensees_detachees"
+                                               )),
+  n_samples = 2,
+  sample_size = 5000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+### 
+
+## PART III. 'Likely Diderot' fragments check
+
+Selected fragments:
+
+-   fr_on_russia-china
+
+-   fr_sauvage
+
+-   fr_51-55-72-40
+
+### stylo
+
+Russia-China fragments
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = diderot_corpus %>% 
+                         filter(!author %in% c("fr_51-55-72-40", 
+                                               #"fr_on_russia-china", 
+                                               "fr_sauvage")),
+                       n_samples = 2,
+                       sample_size = 2000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+Sauvage fragment
+
+```{r, message=FALSE, warning=FALSE}
+sample_independent_opt(tokenized_df = diderot_corpus %>% 
+                         filter(!author %in% c("fr_51-55-72-40", 
+                                               "fr_on_russia-china"#, 
+                                               #"fr_sauvage"
+                                               )),
+                       n_samples = 2,
+                       sample_size = 4500)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+"Diderot's" selection
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+sample_independent_opt(tokenized_df = diderot_corpus %>% 
+                         filter(!author %in% c(#"fr_51-55-72-40", 
+                                               "fr_on_russia-china", 
+                                               "fr_sauvage")),
+                       n_samples = 2,
+                       sample_size = 2000)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+### 

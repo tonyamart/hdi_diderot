@@ -16,7 +16,7 @@ theme_set(theme_minimal())
 Load 1000 word chunks corpus
 
 ```{r}
-corpus <- readRDS("../data/corpus_chunks.rds")
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
 glimpse(corpus)
 ```
 
@@ -56,7 +56,7 @@ head(raw_corpus) # in this corpus each 2k chunk = 2 rows
 Load problems: segments from HDI editions of 1770, 1774, and 1780.
 
 ```{r}
-editions <- list.files(path = "../data/test_fragments/",
+editions <- list.files(path = "../../data/test_fragments/",
                        pattern = "ed",
                        full.names = T)
 
@@ -67,7 +67,7 @@ editions <- tibble(
   title = editions,
   text = sapply(path, read_file)
 ) %>% 
-  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+  mutate(title = str_remove_all(title, "^\\.\\./\\.\\./data/test_fragments//|\\.txt"))
 
 str(editions)
 ```

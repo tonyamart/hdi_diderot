@@ -1,0 +1,642 @@
+---
+title: "03_0_FP"
+format: md
+editor: visual
+---
+
+This notebook uses iterative GI methods to test the attribution of known fragments.
+
+### Load data & pckg
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(tidytext)
+library(stylo)
+library(seetrees)
+library(tinytex)
+
+theme_set(theme_minimal())
+library(MetBrewer)
+library(cowplot)
+```
+
+```{r}
+corpus <- readRDS("../../data/corpus_tokenized.rds")
+
+unique(corpus$author)
+
+corpus_tokenized <- corpus %>% 
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author))
+
+glimpse(corpus_tokenized)
+
+rm(corpus)
+```
+
+```{r}
+fp1 <- tibble(
+  path = "../../data/test_fragments/FP1.txt",
+  title = "1772_fragment_politique",
+  author = "FP",
+  text = read_file(path)
+) %>% 
+  unnest_tokens(input = text, output = word, token = "words")
+```
+
+### fn
+
+Sampling function
+
+```{r}
+sample_independent_opt <- function(tokenized_df,
+  n_samples,
+  sample_size,
+  text_var = "word",
+  folder = "corpus_sampled/", overwrite=T) {
+
+
+  # create a folder
+  dir.create(folder)
+  
+  # rewrite all files in the folder if the folder existed before & not empty
+  if(overwrite) {
+    do.call(file.remove, list(list.files(folder, full.names = TRUE)))
+  }
+  
+  shuff <- tokenized_df %>%
+    group_by(author) %>%
+    sample_n(n_samples * sample_size) %>% # sample tokens
+    # to each sampled token assign randomly a sample number
+    mutate(sample_x = sample( # sample = reshuffle the numbers of samples repeated below
+    rep( # repeat
+      1:n_samples, # the numbers of samples (1, 2, 3...)
+      each = sample_size # each is sample_size times repeated
+      ))) %>%
+    # create a column author_sampleX
+    unite(sample_id, c(author, sample_x), remove = F) %>%
+    # group and paste together by sample_id (some kind of special paste with !!sym() )
+    group_by(sample_id) %>%
+    summarise(text = paste(!!sym(text_var), collapse = " "))
+    
+    # write samples
+    for(i in 1:nrow(shuff)) {
+    write_file(file=paste0(folder, shuff$sample_id[i],".txt"), shuff$text[i])
+  }
+}
+```
+
+Frequencies counter
+
+```{r}
+diy_stylo <- function(folder = "corpus_sampled/",
+                      mfw = 200,
+                      drop_words = T,
+                      feature = "word",
+                      n_gram = 1) {
+  
+  # read the sampled texts from the folder corpus_sampled/
+  # the feature is either word or charaters
+  # the tokenizer returns lists of tokens for each text from the folder
+  tokenized.texts = load.corpus.and.parse(
+    files = list.files(folder, full.names = T),
+    features = feature,
+    ngram.size = n_gram
+  )
+  # computing a list of most frequent words (trimmed to top 2000 items):
+  features = make.frequency.list(tokenized.texts, head = 2000)
+  # producing a table of relative frequencies:
+  data = make.table.of.frequencies(tokenized.texts, features, relative = TRUE)#[,1:mfw]
+  
+  
+  
+  # --- cleaning ---
+  # remove stop words
+  s_words <- str_detect(colnames(data), str_dev_words) # output is a logical vector with the positions of the 
+  if(drop_words) {
+    data <- data[,!s_words]
+  }
+  # crop mfw
+  data <- data[, 1:mfw]
+  # clean document names
+  
+  rownames(data) <- str_remove_all(rownames(data), "corpus_sampled/") # Clean Rownammes
+  rownames(data) <- str_remove_all(rownames(data), "^.*?//") # clean rownames from full paths
+  
+  
+  # output
+  return(data)
+}
+
+```
+
+## FP
+
+Ground truth tests of HDI fragment which is known to be Diderot's
+
+Number of words in FP 1772:
+
+```{r}
+nrow(fp1)
+```
+
+```{r}
+# check if the columns are the same in the two sets
+colnames(corpus_tokenized)
+colnames(fp1)
+
+fp_corpus <- rbind(fp1, corpus_tokenized) # corpus with two Diderot sets
+```
+
+### stylo tests
+
+MFW 100
+
+```{r, message=FALSE, warning=FALSE}
+sample_independent_opt(tokenized_df = fp_corpus,
+  n_samples = 2,
+  sample_size = 3900) # fp1 = 7891 words, 3900*2=7800
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 100,
+  mfw.max = 100,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+MFW 200
+
+```{r, message=FALSE, warning=FALSE}
+
+sample_independent_opt(tokenized_df = fp_corpus,
+  n_samples = 2,
+  sample_size = 3900)
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 200,
+  mfw.max = 200,
+  analyzed.features = "w",
+  ngram.size = 1,
+  distance.measure = "wurzburg"
+  )
+```
+
+### BCT
+
+MFW 50-250, 2000 words samples
+
+```{r, message=FALSE, warning=FALSE}
+sample_independent_opt(tokenized_df = fp_corpus,
+  n_samples = 2,
+  sample_size = 2000)
+
+# bootstrap consensus tree
+bct <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  analyzed.features = "w",
+  ngram.size = 1,
+  mfw.min = 50,
+  mfw.max = 250,
+  mfw.incr = 1,
+  distance.measure = "wurzburg",
+  analysis.type = "BCT",
+  consensus.strength = 0.5
+)
+```
+
+MFW 50 - 250, 3900 words
+
+```{r, message=FALSE, warning=FALSE}
+
+sample_independent_opt(tokenized_df = fp_corpus,
+  n_samples = 2,
+  sample_size = 3900)
+
+# bootstrap consensus tree
+bct <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  analyzed.features = "w",
+  ngram.size = 1,
+  mfw.min = 50,
+  mfw.max = 250,
+  mfw.incr = 1,
+  distance.measure = "wurzburg",
+  analysis.type = "BCT",
+  consensus.strength = 0.5
+)
+```
+
+MFW 50 - 450
+
+```{r, message=FALSE, warning=FALSE}
+
+sample_independent_opt(tokenized_df = fp_corpus,
+  n_samples = 2,
+  sample_size = 3900)
+
+# bootstrap consensus tree
+bct <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  analyzed.features = "w",
+  ngram.size = 1,
+  mfw.min = 50,
+  mfw.max = 450,
+  mfw.incr = 1,
+  distance.measure = "wurzburg",
+  analysis.type = "BCT",
+  consensus.strength = 0.5
+)
+```
+
+```{r}
+# clean env
+rm(bct, test1, fp1)
+```
+
+### Imposters
+
+#### 3800 words samples
+
+Use all texts from Diderot
+
+```{r}
+str_dev_words <- c("changed") # word for removal from MFW vector
+```
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, include=FALSE}
+
+unique(fp_corpus$author)
+
+sample_independent_opt(tokenized_df = fp_corpus,
+  n_samples = 2,
+  sample_size = 3900)
+
+dtm <- diy_stylo(
+  folder = "corpus_sampled/",
+  mfw = 200,
+  drop_words = F)
+
+grep("FP", rownames(dtm))
+```
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+imp_res <- vector(mode = "list")
+r <- NULL
+counter <- 0
+
+for (i in 1:50) {
+  
+  # create samples for each trial
+  sample_independent_opt(
+    tokenized_df = fp_corpus, 
+    n_samples = 2, 
+    sample_size = 3900)
+  
+  # build doc-term matrix from the samples in the corpus_sampled folder
+  data = diy_stylo(mfw = 200, 
+                    feature = "word",
+                    n_gram = 1)
+  
+  # test each of the true FV-L1 sets
+  for (s in c(13, 14)) {
+    
+    # run imposters test
+    r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
+                   test = data[c(s),], # test one of the samples against the others
+                   features = 0.5, # test 50% of the features in each trial
+                   iterations = 100,
+                   distance = "wurzburg"
+                   )
+    
+    # count iterations
+    counter <- counter + 1
+    
+    # store results
+    
+    imp_res[[counter]] <- tibble(candidate = names(r),
+                                 proportion = r)
+    
+    print(counter)
+  }
+  
+}
+
+saveRDS(imp_res, "imp_res/imp_res_FP.rds")
+```
+
+```{r}
+imp_res <- readRDS("imp_res/imp_res_FP.rds")
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  #filter(candidate %in% c("Diderot", "Meister", "Condorcet", "dHolbach", "Deleyre")) %>% 
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772",
+       x = "Top 5 candidates", y = "Proportion") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 10),
+        legend.position = "None"
+        )
+
+
+# shorter version of the plot 
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  # filter top-5 authors from above (exept Marmontel)
+  filter(candidate %in% c(
+    "Diderot", "Meister", "Condorcet", "Naigeon", "dHolbach")) %>% 
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772",
+       x = "Top 5 candidates", y = "Proportion") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 10),
+        legend.position = "None"
+        )
+
+ggsave("../plots_paper/fig_1-b.png",
+       plot = last_plot(), dpi = 300, bg = "white",
+       height = 5, width = 6)
+```
+
+#### 2000 words samples
+
+The same experiment but with 2 individual samples of 2 thousand words
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+imp_res <- vector(mode = "list")
+r <- NULL
+counter <- 0
+
+for (i in 1:50) {
+  
+  # create samples for each trial
+  sample_independent_opt(
+    tokenized_df = fp_corpus, 
+    n_samples = 2, 
+    sample_size = 2000)
+  
+  # build doc-term matrix from the samples in the corpus_sampled folder
+  data = diy_stylo(mfw = 200, 
+                    feature = "word",
+                    n_gram = 1)
+  
+  # test each of the true FV-L1 sets
+  for (s in c(13, 14)) {
+    
+    # run imposters test
+    r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
+                   test = data[c(s),], # test one of the samples against the others
+                   features = 0.5, # test 50% of the features in each trial
+                   iterations = 100,
+                   distance = "wurzburg"
+                   )
+    
+    # count iterations
+    counter <- counter + 1
+    
+    # store results
+    
+    imp_res[[counter]] <- tibble(candidate = names(r),
+                                 proportion = r)
+    
+    print(counter)
+  }
+  
+}
+
+saveRDS(imp_res, "imp_res/imp_res_FP-2k.rds")
+```
+
+```{r}
+imp_res <- readRDS("imp_res/imp_res_FP-2k.rds")
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  #filter(candidate %in% c("Diderot", "Meister", "Condorcet", "dHolbach", "Deleyre")) %>% 
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772",
+       x = "Top 5 candidates", y = "Proportion") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 10),
+        legend.position = "None"
+        )
+
+```
+
+nb: Results for smaller sample are worse.
+
+## Random works check
+
+Here a random work for each author is taken and renamed as "masked_Author", after that GI is performed in order to see, if the work will be attributed to the true author (same settings as in actual experiments).
+
+```{r}
+unique(corpus_tokenized$title)[1:10]
+
+# select works with > 8,000 words & less than 100,000 (at least 2 samples of 4k)
+# only for 5 authors
+n_w_work <- corpus_tokenized %>% 
+  filter(author %in% c(
+    "Diderot", "dHolbach", "Baudeau", "Condorcet", "Raynal")) %>% 
+  group_by(author, title) %>% 
+  count() %>% 
+  ungroup()
+
+works <- n_w_work %>% 
+  # for each author
+  group_by(author) %>% 
+  # select works with enough n of words
+  filter(n > 8000 & n < 100000) %>% 
+  # select one random work for each author
+  sample_n(5) %>% 
+  # extract the list
+  pull(title)
+
+works[1:10]
+```
+
+Loop imposters for authors and their works (will take time)
+
+```{r}
+w <- NULL
+a <- NULL
+
+for (i in 1:length(works)) {
+  
+  # select one work
+  w <- works[i]
+  
+  corpus_m <- corpus_tokenized %>% 
+    # the function is grouping by author, so we rewrite the author of this 
+    # one work as an unknown author
+    mutate(author = ifelse(title == w, paste0("masked_", author), author))
+  
+  # run imposters for the work w
+  imp_res <- vector(mode = "list")
+  r <- NULL
+  counter <- 0
+  
+  for (i in 1:50) {
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = corpus_m, 
+      n_samples = 2, 
+      sample_size = 4000)
+    
+    # build doc-term matrix from the samples in the corpus_sampled folder
+    data = diy_stylo(mfw = 200, 
+                      feature = "word",
+                      n_gram = 1)
+    
+    # 23 & 24 are positions of a masked author
+    for (s in c(23, 24)) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-c(23, 24),], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(counter)
+    }
+    
+  }
+  
+  # write results as the name of the works
+  fh = paste0("imp_res/authors_vs_all/", w, ".rds")
+  
+  saveRDS(imp_res, file = fh)
+  
+}
+```
+
+Combined plot
+
+```{r}
+fl <- list.files(path = "imp_res/authors_vs_all/",
+                 pattern = ".rds",
+                 full.names = TRUE)
+
+author_res <- tibble(path = fl,
+                     title = str_remove_all(
+                       path, "imp_res/authors_vs_all//|\\.rds"),
+                     author = str_remove(str_extract(title, "^\\w+_"), "_"))
+
+glimpse(author_res)
+```
+
+fn to plot results
+
+```{r}
+plt <- function(res, author, work) {
+  imp_res %>% 
+  bind_rows() %>% 
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  #filter(candidate %in% c("Diderot", "Meister", "Condorcet", "dHolbach", "Deleyre")) %>% 
+  mutate(gr = ifelse(candidate == author, "a", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = paste0("Proportion of cases where a sample from an author was the closest one\nto ", work),
+       x = "Candidates", y = "Proportion") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 10),
+        legend.position = "None"
+        )
+}
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+unique_authors <- unique(author_res$author)
+unique_authors
+
+plots <- list()
+a <- NULL
+w <- NULL
+
+for (i in 1:length(unique_authors)) {
+  
+  # select author
+  a = unique_authors[i]
+  
+  # extract the author's results from all
+  author_subset <- author_res %>% filter(author == a)
+  
+  # for each work & its imposter results
+  for (j in 1:nrow(author_subset)) {
+    
+    # select work title
+    w <- author_subset$title[j]
+    # select path
+    fh <- author_subset$path[j]
+    
+    # read rds results for this work
+    imp_res <- readRDS(fh)
+    
+    # create a plot and store it in a list
+    plots[[j]] <- plt(imp_res, author = a, work = w)
+    
+  }
+  
+  # for each author: expand the plot list & store the plots
+  plot_grid(plots[[1]], plots[[2]], plots[[3]], plots[[4]], ncol = 1)
+  
+  pltfh <- paste0("imp_res/plots__authors_vs_all/", a, ".png")
+  ggsave(filename = pltfh, plot = last_plot(),
+         height = 25, width = 7, bg = "white")
+  
+}
+```

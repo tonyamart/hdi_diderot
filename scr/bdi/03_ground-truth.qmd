@@ -26,7 +26,7 @@ This part of the notebook select 10 works by each author and use them to see how
 ### 2000 words chunks
 
 ```{r}
-corpus <- readRDS("../data/bdi/corpus_chunks.rds")
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
 
 glimpse(corpus)
 ```
@@ -273,7 +273,7 @@ Load data
 
 ```{r}
 # taking FP and ed1774-nch as there should be at least two works of the presumable author
-fp1 <- list.files(path = "../data/test_fragments/",
+fp1 <- list.files(path = "../../data/test_fragments/",
                        pattern = "FP|ed1774_nch", 
                        full.names = T)
 
@@ -284,7 +284,7 @@ fp <- tibble(
   title = fp1,
   text = sapply(path, read_file)
 ) %>% 
-  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+  mutate(title = str_remove_all(title, "^\\.\\./\\.\\./data/test_fragments//|\\.txt"))
 
 str(fp)
 ```
@@ -379,7 +379,7 @@ head(fp1_chunks)
 Prepare reference corpus and merge with FP data
 
 ```{r}
-corpus <- readRDS("../data/bdi/corpus_chunks.rds")
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
 
 raw_corpus <- corpus %>% 
   separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
@@ -515,7 +515,7 @@ rm(list = ls())
 
 ```{r}
 # taking FP and ed1774-nch as there should be at least two works of the presumable author
-fp1 <- list.files(path = "../data/test_fragments/",
+fp1 <- list.files(path = "../../data/test_fragments/",
                        pattern = "FP|ed1774_CH", 
                        full.names = T)
 
@@ -526,7 +526,7 @@ fp <- tibble(
   title = fp1,
   text = sapply(path, read_file)
 ) %>% 
-  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+  mutate(title = str_remove_all(title, "^\\.\\./\\.\\./data/test_fragments//|\\.txt"))
 
 str(fp)
 
@@ -617,7 +617,7 @@ head(fp1_chunks)
 Attach main data
 
 ```{r}
-corpus <- readRDS("../data/bdi/corpus_chunks.rds")
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
 
 raw_corpus <- corpus %>% 
   separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
@@ -1005,7 +1005,7 @@ This part of the notebook test the method that will be used for the analysis on 
 Load the corpus
 
 ```{r}
-corpus <- readRDS("../data/bdi/corpus_chunks.rds")
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
 glimpse(corpus)
 ```
 
@@ -1269,7 +1269,7 @@ rm(list = ls())
 Here only selected authors with more works are being analysed.
 
 ```{r}
-corpus <- readRDS("../data/bdi/corpus_chunks.rds")
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
 glimpse(corpus)
 ```
 

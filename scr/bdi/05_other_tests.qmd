@@ -139,7 +139,7 @@ mk_splot <- function(plot_data, work, authors) {
 prepare problems
 
 ```{r}
-pr <- list.files(path = "../data/test_fragments/",
+pr <- list.files(path = "../../data/test_fragments/",
                        pattern = "fr|ink|pencil",
                        full.names = T)
 
@@ -150,7 +150,7 @@ problems <- tibble(
   title = pr,
   text = sapply(path, read_file)
 ) %>% 
-  mutate(title = str_remove_all(title, "^\\.\\./data/test_fragments//|\\.txt"))
+  mutate(title = str_remove_all(title, "^\\.\\./\\.\\./data/test_fragments//|\\.txt"))
 
 str(problems)
 ```
@@ -251,7 +251,7 @@ head(problems_chunks)
 #### ref set
 
 ```{r}
-corpus <- readRDS("../data/corpus_chunks.rds")
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
 
 # make 2k chunks
 corpus <- corpus %>% 
