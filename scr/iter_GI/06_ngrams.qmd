@@ -1,0 +1,298 @@
+---
+title: "06_ngrams"
+format: html
+editor: visual
+---
+
+This notebook is doing the GI experiments based not on words but character ngrams
+
+## Load data & pckg
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(tidytext)
+library(stylo)
+
+theme_set(theme_minimal())
+library(MetBrewer)
+library(cowplot)
+```
+
+```{r}
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds") 
+
+# reshape tbl
+corpus <- corpus %>% 
+  separate(col = chunk_id, into = c("chunk_num", "other"), sep = "__") %>% 
+  separate(col = other, into = c("author", "title"), sep = "_") %>% 
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author))
+  
+
+str(corpus)
+```
+
+## fn
+
+Function to create samples
+
+```{r}
+sample_independent_opt <- function(tokenized_df,
+  n_samples,
+  sample_size,
+  text_var = "word",
+  folder = "corpus_sampled/", overwrite=T) {
+
+
+  # create a folder
+  dir.create(folder)
+  
+  # rewrite all files in the folder if the folder existed before & not empty
+  if(overwrite) {
+    do.call(file.remove, list(list.files(folder, full.names = TRUE)))
+  }
+  
+  shuff <- tokenized_df %>%
+    group_by(author) %>%
+    sample_n(n_samples * sample_size) %>% # sample tokens
+    # to each sampled token assign randomly a sample number
+    mutate(sample_x = sample( # sample = reshuffle the numbers of samples repeated below
+    rep( # repeat
+      1:n_samples, # the numbers of samples (1, 2, 3...)
+      each = sample_size # each is sample_size times repeated
+      ))) %>%
+    # create a column author_sampleX
+    unite(sample_id, c(author, sample_x), remove = F) %>%
+    # group and paste together by sample_id (some kind of special paste with !!sym() )
+    group_by(sample_id) %>%
+    summarise(text = paste(!!sym(text_var), collapse = " "))
+    
+    # write samples
+    for(i in 1:nrow(shuff)) {
+    write_file(file=paste0(folder, shuff$sample_id[i],".txt"), shuff$text[i])
+  }
+}
+```
+
+fn to count frequencies
+
+```{r}
+diy_stylo <- function(folder = "corpus_sampled/",
+                      mfw = 200,
+                      drop_words = T,
+                      feature = "word",
+                      n_gram = 1) {
+  
+  # read the sampled texts from the folder corpus_sampled/
+  # the feature is either word or charaters
+  # the tokenizer returns lists of tokens for each text from the folder
+  tokenized.texts = load.corpus.and.parse(
+    files = list.files(folder, full.names = T),
+    features = feature,
+    ngram.size = n_gram
+  )
+  # computing a list of most frequent words (trimmed to top 2000 items):
+  features = make.frequency.list(tokenized.texts, head = 2000)
+  # producing a table of relative frequencies:
+  data = make.table.of.frequencies(tokenized.texts, features, relative = TRUE)#[,1:mfw]
+  
+  
+  
+  # --- cleaning ---
+  # remove stop words
+  s_words <- str_detect(colnames(data), str_dev_words) # output is a logical vector with the positions of the 
+  if(drop_words) {
+    data <- data[,!s_words]
+  }
+  # crop mfw
+  data <- data[, 1:mfw]
+  # clean document names
+  
+  rownames(data) <- str_remove_all(rownames(data), "corpus_sampled/") # Clean Rownammes
+  rownames(data) <- str_remove_all(rownames(data), "^.*?//") # clean rownames from full paths
+  
+  
+  # output
+  return(data)
+}
+
+```
+
+## FP char count
+
+```{r}
+fp1 <- tibble(
+  path = "../../data/test_fragments/FP1.txt",
+  title = "1772_fragment_politique",
+  author = "FP",
+  text = read_file(path)
+) 
+
+glimpse(fp1)
+
+fp <- fp1 %>% 
+  # remove punct etc with unnest_tokens
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "\\d+")) %>% 
+  mutate(word = str_replace_all(word, "&", "et")) %>% 
+  mutate(word = str_replace_all(word, "[[:punct:]]", " ")) %>% 
+  mutate(text = paste(word, collapse = "_")) %>% 
+  select(-word) %>% 
+  distinct() %>%  # now it's a cleaner text with tokens separated by _
+  # ngram cut
+  unnest_character_shingles(input = text, output = word, 
+                            n = 4,
+                            strip_non_alphanum = FALSE) %>% 
+  # same cols and their order as in corpus_tokenized:
+  mutate(chunk_num = "1") %>% 
+  select(chunk_num, author, title, word)
+  
+
+# number of ngrams in fp
+nrow(fp)
+```
+
+## stylo exploration
+
+In this experiments, the consecutive samples are used and then being sampled.
+
+Mean number of 4char-ngrams in 1000 words: \~5k ngrams
+
+```{r}
+corpus %>% 
+  sample_n(10) %>% 
+  mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+  unnest_character_shingles(input = text, output = ngram, n = 4, 
+                            strip_non_alphanum = FALSE) %>% 
+  group_by(title) %>% 
+  count() %>% 
+  ungroup() %>% 
+  summarise(mean_ngram = mean(n), 
+            median_ngram = median(n))
+```
+
+Example
+
+```{r}
+corpus[1:2,] %>% 
+  mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+  unnest_character_shingles(input = text, output = ngram, n = 4, 
+                            strip_non_alphanum = FALSE)
+```
+
+Total number of chunks for each author (min = 27)
+
+```{r}
+corpus %>% 
+  count(author, sort = T)
+```
+
+### outline
+
+Outline
+
+-   randomly take 20 consequitive samples for each author (=20 000 words, \~100 000 ngrams)
+
+-   prepare sth as 'corpus_tokenized' out of that: a table with 1row=1ngram
+
+-   sample 2 random samples of 20 000 ngrams
+
+-   build the analysis based on this
+
+### 
+
+```{r}
+# take random 20 samples for each author
+corpus_s <- corpus %>% 
+  group_by(author) %>% 
+  sample_n(20) %>% 
+  ungroup()
+
+# count character ngrams in each chunk
+corpus_tokenized <- corpus_s %>% 
+  # replace whitespace with _
+  mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+  # separate ngrams (leave output column as "word")
+  unnest_character_shingles(input = text, output = word, n = 4, 
+                            strip_non_alphanum = FALSE, drop = F) %>% 
+  select(-text)
+
+head(corpus_tokenized)
+
+# number of ngrams per author
+corpus_tokenized %>% 
+  count(author, sort = T)
+```
+
+Attach FP
+
+```{r}
+colnames(fp)
+colnames(corpus_tokenized)
+
+corpus_tokenized <- rbind(fp, corpus_tokenized)
+```
+
+```{r}
+corpus_tokenized %>%  
+  count(word, sort = T) %>% head(200)
+```
+
+### stylo basic trees
+
+```{r, message=FALSE, warning=FALSE}
+sample_independent_opt(corpus_tokenized,
+                       n_samples = 2,
+                       sample_size = 20000, # ~sth comparable to 
+                       text_var = "word",
+                       folder = "corpus_sampled/",
+                       overwrite = T)
+
+
+test1 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 100,
+  mfw.max = 100,
+  analyzed.features = "c", 
+  ngram.size = 4,
+  distance.measure = "wurzburg"
+  )
+```
+
+```{r}
+test2 <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  mfw.min = 500,
+  mfw.max = 500,
+  analyzed.features = "c", 
+  ngram.size = 4,
+  distance.measure = "wurzburg"
+  )
+```
+
+### bct
+
+```{r, message=FALSE, warning=FALSE}
+sample_independent_opt(tokenized_df = fp_corpus,
+  n_samples = 2,
+  sample_size = 2000)
+
+# bootstrap consensus tree
+bct <- stylo(
+  gui = F,
+  corpus.dir = "corpus_sampled/",
+  corpus.lang = "French",
+  analyzed.features = "w",
+  ngram.size = 1,
+  mfw.min = 50,
+  mfw.max = 250,
+  mfw.incr = 1,
+  distance.measure = "wurzburg",
+  analysis.type = "BCT",
+  consensus.strength = 0.5
+)
+```

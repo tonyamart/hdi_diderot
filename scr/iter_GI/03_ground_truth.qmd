@@ -489,14 +489,20 @@ works <- n_w_work %>%
   # extract the list
   pull(title)
 
-works[1:10]
+works[10:20]
+
+
 ```
 
 Loop imposters for authors and their works (will take time)
 
 ```{r}
+# start form 8th work (any)
+
 w <- NULL
 a <- NULL
+
+str_dev_words <- c("changed") # word for removal from MFW vector
 
 for (i in 1:length(works)) {
   
