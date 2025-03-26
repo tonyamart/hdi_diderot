@@ -40,8 +40,28 @@ fp1 <- tibble(
   title = "1772_fragment_politique",
   author = "FP",
   text = read_file(path)
-) %>% 
+) 
+
+
+# some cleaning before merging
+fp <- fp1 %>%
+  # remove punct etc with unnest_tokens
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # remove digits
+  filter(!str_detect(word, "\\d+")) %>% 
+  # replace & with et
+  mutate(word = str_replace_all(word, "&", " et ")) %>% 
+  # replace all punctuation marks with space
+  mutate(word = str_replace_all(word, "[[:punct:]]", " ")) %>% 
+  # paste back as a text
+  mutate(text = paste(word, collapse = " ")) %>% 
+  select(-word) %>% 
+  distinct() %>% 
+  
+  # tokenize
   unnest_tokens(input = text, output = word, token = "words")
+
+rm(fp1)
 ```
 
 ### fn
@@ -137,15 +157,19 @@ Ground truth tests of HDI fragment which is known to be Diderot's
 Number of words in FP 1772:
 
 ```{r}
-nrow(fp1)
+nrow(fp)
+
+fp %>% 
+  select(word) %>% 
+  sample_n(10)
 ```
 
 ```{r}
 # check if the columns are the same in the two sets
 colnames(corpus_tokenized)
-colnames(fp1)
+colnames(fp)
 
-fp_corpus <- rbind(fp1, corpus_tokenized) # corpus with two Diderot sets
+fp_corpus <- rbind(fp, corpus_tokenized) # corpus with two Diderot sets
 ```
 
 ### stylo tests
@@ -155,7 +179,7 @@ MFW 100
 ```{r, message=FALSE, warning=FALSE}
 sample_independent_opt(tokenized_df = fp_corpus,
   n_samples = 2,
-  sample_size = 3900) # fp1 = 7891 words, 3900*2=7800
+  sample_size = 4000) # fp1 = 8504 words
 
 test1 <- stylo(
   gui = F,
@@ -175,7 +199,7 @@ MFW 200
 
 sample_independent_opt(tokenized_df = fp_corpus,
   n_samples = 2,
-  sample_size = 3900)
+  sample_size = 4000)
 
 test1 <- stylo(
   gui = F,
@@ -220,7 +244,7 @@ MFW 50 - 250, 3900 words
 
 sample_independent_opt(tokenized_df = fp_corpus,
   n_samples = 2,
-  sample_size = 3900)
+  sample_size = 4000)
 
 # bootstrap consensus tree
 bct <- stylo(
@@ -244,7 +268,7 @@ MFW 50 - 450
 
 sample_independent_opt(tokenized_df = fp_corpus,
   n_samples = 2,
-  sample_size = 3900)
+  sample_size = 4000)
 
 # bootstrap consensus tree
 bct <- stylo(
@@ -264,12 +288,12 @@ bct <- stylo(
 
 ```{r}
 # clean env
-rm(bct, test1, fp1)
+rm(bct, test1, fp)
 ```
 
 ### Imposters
 
-#### 3800 words samples
+#### 4000 words samples
 
 Use all texts from Diderot
 
@@ -283,7 +307,7 @@ unique(fp_corpus$author)
 
 sample_independent_opt(tokenized_df = fp_corpus,
   n_samples = 2,
-  sample_size = 3900)
+  sample_size = 4000)
 
 dtm <- diy_stylo(
   folder = "corpus_sampled/",
@@ -292,6 +316,38 @@ dtm <- diy_stylo(
 
 grep("FP", rownames(dtm))
 ```
+
+Calculate confidence interval
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(fp_corpus,
+                     sample_size = 4000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "FP_optimise_list_w.rds")
+```
+
+Run imposters
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE}
 imp_res <- vector(mode = "list")
@@ -304,7 +360,7 @@ for (i in 1:50) {
   sample_independent_opt(
     tokenized_df = fp_corpus, 
     n_samples = 2, 
-    sample_size = 3900)
+    sample_size = 4000)
   
   # build doc-term matrix from the samples in the corpus_sampled folder
   data = diy_stylo(mfw = 200, 
@@ -338,6 +394,17 @@ for (i in 1:50) {
 saveRDS(imp_res, "imp_res/imp_res_FP.rds")
 ```
 
+Extract and plot results
+
+```{r}
+# optimisation (CI lines)
+
+op_list_w <- readRDS("FP_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+```
+
 ```{r}
 imp_res <- readRDS("imp_res/imp_res_FP.rds")
 
@@ -349,7 +416,13 @@ imp_res %>%
   ggplot(aes(x = reorder(candidate, proportion),
   y = proportion)) + 
   geom_boxplot(aes(fill = gr)) + 
-  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
