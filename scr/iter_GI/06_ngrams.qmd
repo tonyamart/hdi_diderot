@@ -118,6 +118,8 @@ diy_stylo <- function(folder = "corpus_sampled/",
 
 ```
 
+# FP
+
 ## FP char count
 
 ```{r}
@@ -317,7 +319,7 @@ bct <- stylo(
 )
 ```
 
-### imposters
+## imposters
 
 ```{r}
 str_dev_words <- c("chan")
@@ -495,4 +497,421 @@ for (i in 1:50) {
 }
 
 saveRDS(imp_res, "imp_res/imp_res_FP_chars_mf500.rds")
+```
+
+# Problems
+
+## load problems
+
+1 row = 1 work
+
+```{r}
+# editions data
+
+l <- list.files(path = "../../data/test_fragments/",
+                pattern = "^ed",
+                full.names = T)
+
+ed <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'|_", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$")) %>% 
+  filter(!word %in% c("changed", "appeared", "unchanged")) %>% 
+  group_by(author) %>% 
+  mutate(text = paste0(word, collapse = " "),
+         title = author, 
+         chunk_num = "1") %>% 
+  select(-word) %>% 
+  ungroup() %>% 
+  distinct() %>% 
+  select(chunk_num, author, title, text)
+
+head(ed)
+
+
+# pencil / ink data
+l <- list.files(path = "../../data/test_fragments/",
+                pattern = "^ink|^pencil",
+                full.names = T
+                )
+
+ink_pencil <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'|_", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$")) %>% 
+  filter(!word %in% c("changed", "appeared", "unchanged")) %>% 
+  group_by(author) %>% 
+  mutate(text = paste0(word, collapse = " "),
+         title = author, 
+         chunk_num = "1") %>% 
+  select(-word) %>% 
+  ungroup() %>% 
+  distinct() %>% 
+  select(chunk_num, author, title, text)
+
+head(ink_pencil)
+
+# likely Diderot's book chunks from FV recombination
+l <- list.files(path = "../../data/test_fragments/",
+                pattern = "^fr",
+                full.names = T
+                )
+
+diderot <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'|_", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$")) %>% 
+  filter(!word %in% c("changed", "appeared", "unchanged")) %>% 
+  group_by(author) %>% 
+  mutate(text = paste0(word, collapse = " "),
+         title = author, 
+         chunk_num = "1") %>% 
+  select(-word) %>% 
+  ungroup() %>% 
+  distinct() %>% 
+  select(chunk_num, author, title, text)
+
+head(diderot)
+```
+
+## Editions
+
+Number of ngrams in each selection
+
+```{r}
+glimpse(ed)
+
+ed %>% 
+  # replace whitespace with _
+  mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+    # separate ngrams (leave output column as "word")
+  unnest_character_shingles(input = text, output = word, n = 4, 
+                            strip_non_alphanum = FALSE, drop = F) %>% 
+  select(-text) %>% 
+  group_by(author) %>% 
+  count()
+```
+
+```{r}
+str_dev_words <- c("chan")
+```
+
+#### loop
+
+1770 - unchanged: 65 307 ngrams
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+# first we sample chunks for each author
+# take random 20 samples for each author
+corpus_s <- corpus %>% 
+    group_by(author) %>% 
+    sample_n(20) %>% 
+    ungroup() %>% 
+    
+    # attach ED chunks #### only the needed one! ####
+    rbind(ed %>% filter(title == "ed1770_nch1774_nch1780"))
+
+# then do tokenisation = cut ngrams
+ed_corpus <- corpus_s %>% 
+    # replace whitespace with _
+    mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+    # separate ngrams (leave output column as "word")
+    unnest_character_shingles(input = text, output = word, n = 4, 
+                              strip_non_alphanum = FALSE, drop = F) %>% 
+    select(-text)
+
+ed_corpus %>% 
+  count(author, sort = T)
+
+sample_independent_opt(tokenized_df = ed_corpus,
+  n_samples = 2,
+  sample_size = 20000) # 20k ngrams 2 ind samples
+
+data <- diy_stylo(mfw = 200, 
+                    feature = "c",
+                    n_gram = 4)
+
+data[1:7, 1:7]
+
+grep("ed", rownames(data))
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+titles <- ed$title
+
+imp_res <- vector(mode = "list")
+
+counter <- 0
+
+for (j in 1:length(titles)) {
+  
+  # select problem
+  t <- titles[j]
+
+  for (i in 1:50) {
+    
+    # first we sample chunks for each author
+    # take random 20 samples for each author
+    corpus_s <- corpus %>% 
+        group_by(author) %>% 
+        sample_n(20) %>% 
+        ungroup() %>% 
+        
+        # attach ED chunks #### only the needed one! ####
+        rbind(ed %>% filter(title == t))
+    
+    # then do tokenisation = cut ngrams
+    ed_corpus <- corpus_s %>% 
+        # replace whitespace with _
+        mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+        # separate ngrams (leave output column as "word")
+        unnest_character_shingles(input = text, output = word, n = 4, 
+                                  strip_non_alphanum = FALSE, drop = F) %>% 
+        select(-text)
+    
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = ed_corpus, 
+      n_samples = 2, 
+      sample_size = 13000) # smaller samples bcs of one of the problems
+    
+    data <- diy_stylo(folder = "corpus_sampled/",
+                      mfw = 500, 
+                      feature = "c",
+                      n_gram = 4)
+    
+      
+    # test each of independent samples from the problem
+    for (s in c(13, 14)) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(paste(t, counter))
+    }
+    
+  }
+  
+  fh <- paste0("imp_res/ngrams/", t, ".rds")
+  
+  saveRDS(imp_res, file = fh)
+}
+```
+
+1770_CH_nch - 31 358 ngrams
+
+1770_nch_CH - 102 056
+
+1770_CH_CH - 92 995
+
+1774_nch - 26 948
+
+1774_CH - 101 504
+
+1780 - 475 194
+
+#### plots
+
+```{r}
+fl <- list.files(path = "imp_res/ngrams/",
+                 full.names = T)
+
+lables_df <- tibble(file = fl, 
+                    abbr = str_remove_all(fl, "imp_res/ngrams//|\\.rds"), 
+                    title = c("fff")) # insert titles from 05_scr here
+```
+
+```{r}
+
+lables_df
+
+
+for (i in 1:length(fl)) {
+  
+  x <- lables_df$file[i]
+  
+  imp_res <- readRDS(x)
+
+  imp_res %>%
+    bind_rows() %>% #stack all the optained prop tables into one 
+    mutate(candidate = str_remove(candidate, "^/")) %>% 
+    ggplot(aes(x = reorder(candidate, - proportion),
+    y = proportion)) +
+    geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+    theme_bw() + 
+    labs(subtitle = lables_df$title[i]) +
+    theme(axis.text.x = element_text(angle = 25))
+  
+  fh <- paste0("imp_res/plots_ngrams/", lables_df$abbr, ".png")
+  
+  ggsave(file = fh, plot = last_plot(),
+         width = 8, height = 6, bg = "white")
+  
+}
+```
+
+## Ink - pencil
+
+```{r}
+ink_pencil %>% 
+  # replace whitespace with _
+  mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+    # separate ngrams (leave output column as "word")
+  unnest_character_shingles(input = text, output = word, n = 4, 
+                            strip_non_alphanum = FALSE, drop = F) %>% 
+  select(-text) %>% 
+  group_by(author) %>% 
+  count() # a lot of data
+```
+
+Imposters loop
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+titles <- ink_pencil$title
+
+imp_res <- vector(mode = "list")
+
+counter <- 0
+
+for (j in 1:length(titles)) {
+  
+  # select problem
+  t <- titles[j]
+
+  for (i in 1:50) {
+    
+    # first we sample chunks for each author
+    # take random 20 samples for each author
+    corpus_s <- corpus %>% 
+        group_by(author) %>% 
+        sample_n(20) %>% 
+        ungroup() %>% 
+        
+        # attach ED chunks #### only the needed one! ####
+        rbind(ink_pencil %>% filter(title == t))
+    
+    # then do tokenisation = cut ngrams
+    ink_corpus <- corpus_s %>% 
+        # replace whitespace with _
+        mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+        # separate ngrams (leave output column as "word")
+        unnest_character_shingles(input = text, output = word, n = 4, 
+                                  strip_non_alphanum = FALSE, drop = F) %>% 
+        select(-text)
+    
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = ink_corpus, 
+      n_samples = 2, 
+      sample_size = 20000) 
+    
+    data <- diy_stylo(folder = "corpus_sampled/",
+                      mfw = 500, 
+                      feature = "c",
+                      n_gram = 4)
+    
+    # find positions for ink / pencil
+    x <- c(grep(t, rownames(data))[1], grep(t, rownames(data))[2])
+    x
+      
+    # test each of independent samples from the problem
+    for (s in x) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-x,], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(paste(t, counter))
+    }
+    
+  }
+  
+  fh <- paste0("imp_res/ngrams/", t, ".rds")
+  
+  saveRDS(imp_res, file = fh)
+}
+```
+
+## print all plots
+
+Plots loop
+
+```{r}
+fl <- list.files(path = "imp_res/ngrams/",
+                 full.names = T)
+
+lables_df <- tibble(file = fl, 
+                    abbr = str_remove_all(fl, "imp_res/ngrams//|\\.rds"), 
+                    title = c("fff")) # insert titles from 05_scr here
+
+lables_df
+
+
+for (i in 1:length(fl)) {
+  
+  x <- lables_df$file[i]
+  
+  imp_res <- readRDS(x)
+
+  imp_res %>%
+    bind_rows() %>% #stack all the optained prop tables into one 
+    mutate(candidate = str_remove(candidate, "^/")) %>% 
+    ggplot(aes(x = reorder(candidate, - proportion),
+    y = proportion)) +
+    geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+    theme_bw() + 
+    labs(subtitle = lables_df$title[i]) +
+    theme(axis.text.x = element_text(angle = 25))
+  
+  fh <- paste0("imp_res/plots_ngrams/", lables_df$abbr, ".png")
+  
+  ggsave(file = fh, plot = last_plot(),
+         width = 8, height = 6, bg = "white")
+  
+}
 ```

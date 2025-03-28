@@ -540,6 +540,8 @@ nb: Results for smaller sample are worse.
 
 Here a random work for each author is taken and renamed as "masked_Author", after that GI is performed in order to see, if the work will be attributed to the true author (same settings as in actual experiments).
 
+### selection of authors & works 
+
 ```{r}
 unique(corpus_tokenized$title)[1:10]
 
@@ -567,9 +569,11 @@ works[10:20]
 
 ```
 
+### imposters loop
+
 Loop imposters for authors and their works (will take time)
 
-```{r}
+```{r, include=TRUE, eval=FALSE, message=FALSE}
 # start form 8th work (any)
 
 w <- NULL
@@ -592,7 +596,7 @@ for (i in 1:length(works)) {
   r <- NULL
   counter <- 0
   
-  for (i in 1:50) {
+  for (j in 1:50) {
     
     # create samples for each trial
     sample_independent_opt(
@@ -604,6 +608,8 @@ for (i in 1:length(works)) {
     data = diy_stylo(mfw = 200, 
                       feature = "word",
                       n_gram = 1)
+    
+    # grep("masked", rownames(data))
     
     # 23 & 24 are positions of a masked author
     for (s in c(23, 24)) {
@@ -637,7 +643,9 @@ for (i in 1:length(works)) {
 }
 ```
 
-Combined plot
+### plots
+
+Combined plot. Read results in a tibble
 
 ```{r}
 fl <- list.files(path = "imp_res/authors_vs_all/",
@@ -647,7 +655,8 @@ fl <- list.files(path = "imp_res/authors_vs_all/",
 author_res <- tibble(path = fl,
                      title = str_remove_all(
                        path, "imp_res/authors_vs_all//|\\.rds"),
-                     author = str_remove(str_extract(title, "^\\w+_"), "_"))
+                     author = str_remove(str_extract(title, "^\\w+\\s?\\w?\\w?_"), "_")) %>% 
+  mutate(author = str_replace(author, "Diderot II", "Diderot"))
 
 glimpse(author_res)
 ```
@@ -676,6 +685,8 @@ plt <- function(res, author, work) {
         )
 }
 ```
+
+One plot for each author
 
 ```{r, warning=FALSE, message=FALSE}
 
@@ -711,11 +722,431 @@ for (i in 1:length(unique_authors)) {
   }
   
   # for each author: expand the plot list & store the plots
-  plot_grid(plots[[1]], plots[[2]], plots[[3]], plots[[4]], ncol = 1)
+  plot_grid(plots[[1]], plots[[2]], plots[[3]], plots[[4]], plots[[5]], ncol = 1)
   
   pltfh <- paste0("imp_res/plots__authors_vs_all/", a, ".png")
   ggsave(filename = pltfh, plot = last_plot(),
          height = 25, width = 7, bg = "white")
   
 }
+```
+
+## Diderot & Naigeon
+
+```{r}
+w_naigeon <- corpus_tokenized %>% 
+  group_by(author, title) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(author == "Naigeon")
+
+w_naigeon
+
+w_naigeon$title
+```
+
+### test Naigeon works
+
+```{r, include=TRUE, eval=FALSE, message=FALSE}
+
+works <- w_naigeon$title
+
+w <- NULL
+a <- NULL
+
+str_dev_words <- c("changed") # word for removal from MFW vector
+
+for (i in 1:length(works)) {
+  
+  # select one work
+  w <- works[i]
+  
+  corpus_m <- corpus_tokenized %>% 
+    # the function is grouping by author, so we rewrite the author of this 
+    # one work as an unknown author
+    mutate(author = ifelse(title == w, paste0("masked_", author), author))
+  
+  # run imposters for the work w
+  imp_res <- vector(mode = "list")
+  r <- NULL
+  counter <- 0
+  
+  for (j in 1:50) {
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = corpus_m, 
+      n_samples = 2, 
+      sample_size = 4000)
+    
+    # build doc-term matrix from the samples in the corpus_sampled folder
+    data = diy_stylo(mfw = 200, 
+                      feature = "word",
+                      n_gram = 1)
+    
+    # grep("masked", rownames(data))
+    
+    # 23 & 24 are positions of a masked author
+    for (s in c(23, 24)) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-c(23, 24),], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(counter)
+    }
+    
+  }
+  
+  # write results as the name of the works
+  fh = paste0("imp_res/diderot_naigeon/", w, ".rds")
+  
+  saveRDS(imp_res, file = fh)
+  
+}
+```
+
+Plots
+
+```{r}
+fl <- list.files(path = "imp_res/diderot_naigeon/",
+                 pattern = ".rds",
+                 full.names = TRUE)
+
+author_res <- tibble(path = fl,
+                     title = str_remove_all(
+                       path, "imp_res/diderot_naigeon//|\\.rds"),
+                     author = str_remove(str_extract(title, "^\\w+\\s?\\w?\\w?_"), "_")) #%>% 
+  #mutate(author = str_replace(author, "Diderot II", "Diderot"))
+
+glimpse(author_res)
+```
+
+```{r}
+plots <- list()
+a <- NULL
+w <- NULL
+
+  
+# select author
+a = "Naigeon"
+  
+# extract the author's results from all
+author_subset <- author_res %>% filter(author == a)
+  
+# for each work & its imposter results for (j in 1:nrow(author_subset)) {
+    
+    # select work title
+    w <- author_subset$title[j]
+    # select path
+    fh <- author_subset$path[j]
+    
+    # read rds results for this work
+    imp_res <- readRDS(fh)
+    
+    # create a plot and store it in a list
+    plots[[j]] <- plt(imp_res, author = a, work = w)
+    
+  }
+  
+# for each author: expand the plot list & store the plots
+plot_grid(plots[[1]], plots[[2]], plots[[3]], plots[[4]], plots[[5]], ncol = 1)
+  
+pltfh <- paste0("imp_res/plots__authors_vs_all/", a, ".png")
+ggsave(filename = pltfh, plot = last_plot(),
+         height = 25, width = 7, bg = "white")
+  
+
+```
+
+### Diderot w & w/o Naigeon
+
+#### additional works
+
+Select 5 more random works by Diderot (not studied before), not removing the Naigeon selection
+
+```{r}
+w_diderot <- corpus_tokenized %>% 
+  group_by(author, title) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(author == "Diderot") %>% 
+  # cut longer but not too long works
+  filter(n > 10000 & n < 100000)
+
+w_diderot
+
+w_selected <- w_diderot %>% sample_n(5) %>% pull(title)
+w_selected
+```
+
+```{r, include=TRUE, eval=FALSE, message=FALSE}
+
+works <- w_selected
+
+w <- NULL
+a <- NULL
+
+str_dev_words <- c("changed") # word for removal from MFW vector
+
+for (i in 1:length(works)) {
+  
+  # select one work
+  w <- works[i]
+  
+  corpus_m <- corpus_tokenized %>% 
+    # the function is grouping by author, so we rewrite the author of this 
+    # one work as an unknown author
+    mutate(author = ifelse(title == w, paste0("masked_", author), author))
+  
+  # run imposters for the work w
+  imp_res <- vector(mode = "list")
+  r <- NULL
+  counter <- 0
+  
+  for (j in 1:50) {
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = corpus_m, 
+      n_samples = 2, 
+      sample_size = 4000)
+    
+    # build doc-term matrix from the samples in the corpus_sampled folder
+    data = diy_stylo(mfw = 200, 
+                      feature = "word",
+                      n_gram = 1)
+    
+    # grep("masked", rownames(data))
+    
+    # 23 & 24 are positions of a masked author
+    for (s in c(23, 24)) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-c(23, 24),], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(counter)
+    }
+    
+  }
+  
+  # write results as the name of the works
+  fh = paste0("imp_res/diderot_naigeon/", w, ".rds")
+  
+  saveRDS(imp_res, file = fh)
+  
+}
+```
+
+Plots
+
+```{r}
+fl <- list.files(path = "imp_res/diderot_naigeon/",
+                 pattern = ".rds",
+                 full.names = TRUE)
+
+author_res <- tibble(path = fl,
+                     title = str_remove_all(
+                       path, "imp_res/diderot_naigeon//|\\.rds"),
+                     author = str_remove(str_extract(title, "^\\w+\\s?\\w?\\w?_"), "_")) %>% 
+  mutate(author = str_replace(author, "Diderot II", "Diderot"))
+
+glimpse(author_res)
+```
+
+```{r}
+plots <- list()
+a <- NULL
+w <- NULL
+
+# select author
+a = "Diderot"
+  
+# extract the author's results from all
+author_subset <- author_res %>% filter(author == a)
+  
+# for each work & its imposter results 
+for (j in 1:nrow(author_subset)) {
+    
+    # select work title
+    w <- author_subset$title[j]
+    # select path
+    fh <- author_subset$path[j]
+    
+    # read rds results for this work
+    imp_res <- readRDS(fh)
+    
+    # create a plot and store it in a list
+    plots[[j]] <- plt(imp_res, author = a, work = w)
+    
+  }
+  
+# for each author: expand the plot list & store the plots
+plot_grid(plots[[1]], plots[[2]], plots[[3]], plots[[4]], plots[[5]], ncol = 1)
+  
+pltfh <- paste0("imp_res/plots__authors_vs_all/", a, "_additional.png")
+ggsave(filename = pltfh, plot = last_plot(),
+         height = 25, width = 7, bg = "white")
+```
+
+#### w/o Naigeon
+
+Test strangely attributed works without Naigeon
+
+```{r}
+w_selected <- w_diderot %>% 
+  filter(title %in% c("Diderot II_Pensees philosophiques.txt",
+                      "Diderot_Lettre sur les aveugles.txt",
+                      "Diderot_Recherches philosophiques.txt",
+                      "Diderot_Pensees sur l-interpretation.txt"))
+```
+
+```{r, include=TRUE, eval=FALSE, message=FALSE}
+
+works <- w_selected$title
+
+w <- NULL
+a <- NULL
+
+str_dev_words <- c("changed") # word for removal from MFW vector
+
+for (i in 1:length(works)) {
+  
+  # select one work
+  w <- works[i]
+  
+  corpus_m <- corpus_tokenized %>% 
+    # filter out Naigeon
+    filter(author != "Naigeon") %>% 
+    
+    # the function is grouping by author, so we rewrite the author of this 
+    # one work as an unknown author
+    mutate(author = ifelse(title == w, paste0("masked_", author), author))
+  
+  # run imposters for the work w
+  imp_res <- vector(mode = "list")
+  r <- NULL
+  counter <- 0
+  
+  for (j in 1:50) {
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = corpus_m, 
+      n_samples = 2, 
+      sample_size = 4000)
+    
+    # build doc-term matrix from the samples in the corpus_sampled folder
+    data = diy_stylo(mfw = 200, 
+                      feature = "word",
+                      n_gram = 1)
+    
+    # grep("masked", rownames(data))
+    
+    # 23 & 24 are positions of a masked author
+    for (s in c(23, 24)) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-c(23, 24),], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(counter)
+    }
+    
+  }
+  
+  # write results as the name of the works
+  fh = paste0("imp_res/diderot_naigeon/", w, "-wo-Naigeon.rds")
+  
+  saveRDS(imp_res, file = fh)
+  
+}
+```
+
+Plots
+
+```{r}
+fl <- list.files(path = "imp_res/diderot_naigeon/",
+                 pattern = "-wo-Naigeon.rds",
+                 full.names = TRUE)
+
+author_res <- tibble(path = fl,
+                     title = str_remove_all(
+                       path, "imp_res/diderot_naigeon//|\\-wo-Naigeon.rds"),
+                     author = str_remove(str_extract(title, "^\\w+\\s?\\w?\\w?_"), "_")) %>% 
+  mutate(author = str_replace(author, "Diderot II", "Diderot"))
+
+glimpse(author_res)
+```
+
+```{r}
+plots <- list()
+a <- NULL
+w <- NULL
+
+# select author
+a = "Diderot"
+  
+# extract the author's results from all
+author_subset <- author_res %>% filter(author == a)
+  
+# for each work & its imposter results 
+for (j in 1:nrow(author_subset)) {
+    
+    # select work title
+    w <- author_subset$title[j]
+    # select path
+    fh <- author_subset$path[j]
+    
+    # read rds results for this work
+    imp_res <- readRDS(fh)
+    
+    # create a plot and store it in a list
+    plots[[j]] <- plt(imp_res, author = a, work = w)
+    
+  }
+  
+# for each author: expand the plot list & store the plots
+plot_grid(plots[[1]], plots[[2]], plots[[3]], plots[[4]],  ncol = 1)
+  
+pltfh <- paste0("imp_res/plots__authors_vs_all/", a, "_wo-Naigeon.png")
+ggsave(filename = pltfh, plot = last_plot(),
+         height = 25, width = 7, bg = "white")
 ```
