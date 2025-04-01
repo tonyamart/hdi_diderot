@@ -611,9 +611,23 @@ ed %>%
 str_dev_words <- c("chan")
 ```
 
-#### loop
+#### 
 
 1770 - unchanged: 65 307 ngrams
+
+1770_CH_nch - 31 358 ngrams
+
+1770_nch_CH - 102 056
+
+1770_CH_CH - 92 995
+
+1774_nch - 26 948
+
+1774_CH - 101 504
+
+1780 - 475 194
+
+#### test run
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
@@ -729,58 +743,6 @@ for (j in 1:length(titles)) {
 }
 ```
 
-1770_CH_nch - 31 358 ngrams
-
-1770_nch_CH - 102 056
-
-1770_CH_CH - 92 995
-
-1774_nch - 26 948
-
-1774_CH - 101 504
-
-1780 - 475 194
-
-#### plots
-
-```{r}
-fl <- list.files(path = "imp_res/ngrams/",
-                 full.names = T)
-
-lables_df <- tibble(file = fl, 
-                    abbr = str_remove_all(fl, "imp_res/ngrams//|\\.rds"), 
-                    title = c("fff")) # insert titles from 05_scr here
-```
-
-```{r}
-
-lables_df
-
-
-for (i in 1:length(fl)) {
-  
-  x <- lables_df$file[i]
-  
-  imp_res <- readRDS(x)
-
-  imp_res %>%
-    bind_rows() %>% #stack all the optained prop tables into one 
-    mutate(candidate = str_remove(candidate, "^/")) %>% 
-    ggplot(aes(x = reorder(candidate, - proportion),
-    y = proportion)) +
-    geom_boxplot(fill = "darkcyan", alpha = 0.6) +
-    theme_bw() + 
-    labs(subtitle = lables_df$title[i]) +
-    theme(axis.text.x = element_text(angle = 25))
-  
-  fh <- paste0("imp_res/plots_ngrams/", lables_df$abbr, ".png")
-  
-  ggsave(file = fh, plot = last_plot(),
-         width = 8, height = 6, bg = "white")
-  
-}
-```
-
 ## Ink - pencil
 
 ```{r}
@@ -877,7 +839,93 @@ for (j in 1:length(titles)) {
 }
 ```
 
-## print all plots
+## Selected fragments
+
+```{r}
+head(diderot)
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+titles <- diderot$title
+
+imp_res <- vector(mode = "list")
+
+counter <- 0
+
+for (j in 2:length(titles)) {
+  
+  # select problem
+  t <- titles[j]
+
+  for (i in 1:50) {
+    
+    # first we sample chunks for each author
+    # take random 20 samples for each author
+    corpus_s <- corpus %>% 
+        group_by(author) %>% 
+        sample_n(20) %>% 
+        ungroup() %>% 
+        
+        # attach ED chunks #### only the needed one! ####
+        rbind(diderot %>% filter(title == t))
+    
+    # then do tokenisation = cut ngrams
+    d_corpus <- corpus_s %>% 
+        # replace whitespace with _
+        mutate(text = str_replace_all(text, "\\s|\\W", "_")) %>% 
+        # separate ngrams (leave output column as "word")
+        unnest_character_shingles(input = text, output = word, n = 4, 
+                                  strip_non_alphanum = FALSE, drop = F) %>% 
+        select(-text)
+    
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = d_corpus, 
+      n_samples = 2, 
+      sample_size = 12000) 
+    
+    data <- diy_stylo(folder = "corpus_sampled/",
+                      mfw = 500, 
+                      feature = "c",
+                      n_gram = 4)
+    
+    # find positions for ink / pencil
+    x <- c(grep(t, rownames(data))[1], grep(t, rownames(data))[2])
+    x
+      
+    # test each of independent samples from the problem
+    for (s in x) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-x,], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(paste(t, counter))
+    }
+    
+  }
+  
+  fh <- paste0("imp_res/ngrams/", t, ".rds")
+  
+  saveRDS(imp_res, file = fh)
+}
+```
+
+# print all plots
 
 Plots loop
 
@@ -886,8 +934,7 @@ fl <- list.files(path = "imp_res/ngrams/",
                  full.names = T)
 
 lables_df <- tibble(file = fl, 
-                    abbr = str_remove_all(fl, "imp_res/ngrams//|\\.rds"), 
-                    title = c("fff")) # insert titles from 05_scr here
+                    abbr = str_remove_all(fl, "imp_res/ngrams//|\\.rds")) 
 
 lables_df
 
@@ -905,10 +952,10 @@ for (i in 1:length(fl)) {
     y = proportion)) +
     geom_boxplot(fill = "darkcyan", alpha = 0.6) +
     theme_bw() + 
-    labs(subtitle = lables_df$title[i]) +
+    labs(subtitle = lables_df$abbr[i]) +
     theme(axis.text.x = element_text(angle = 25))
   
-  fh <- paste0("imp_res/plots_ngrams/", lables_df$abbr, ".png")
+  fh <- paste0("imp_res/plots_ngrams/", lables_df$abbr[i], ".png")
   
   ggsave(file = fh, plot = last_plot(),
          width = 8, height = 6, bg = "white")

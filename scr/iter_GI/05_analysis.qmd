@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-## Stylometric analysis
+## General Impostors analysis
 
 Some data preparation & cleaning
 
@@ -107,7 +107,10 @@ unique(corpus$author)
 
 corpus_tokenized <- corpus %>% 
   # combine two Diderot's samples to one
-  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) 
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  
+  # FILTER authors
+  filter(!author %in% c("Marmontel", "Meister", "Naigeon"))
 
 glimpse(corpus_tokenized)
 
@@ -950,15 +953,6 @@ pencil_ink_corpus <- rbind(ink_pencil, corpus_tokenized)
 
 ### Imposters
 
-Unite Diderot's sets
-
-```{r, echo=FALSE}
-pencil_ink_corpus <- pencil_ink_corpus %>% 
-  mutate(author = ifelse(author == "Diderot II", "Diderot", author))
-
-unique(pencil_ink_corpus$author)
-```
-
 #### Pensées détachées (pencil)
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
@@ -1001,10 +995,10 @@ for (i in 1:50) {
                     n_gram = 1)
   
   # test each of the true FV-L1 sets
-  for (s in c(29, 30)) {
+  for (s in c(25, 26)) {
     
     # run imposters test
-    r <- imposters(reference.set = data[-c(29, 30),], # remove test data from the ref
+    r <- imposters(reference.set = data[-c(25, 26),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
                    features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
@@ -1178,13 +1172,6 @@ diderot_corpus %>%
 ```
 
 ### Imposters
-
-```{r, include=FALSE, echo=FALSE}
-diderot_corpus <- diderot_corpus %>% 
-  mutate(author = ifelse(author == "Diderot II", "Diderot", author))
-
-unique(diderot_corpus$author)
-```
 
 #### Russia-China
 
@@ -1457,4 +1444,447 @@ imp_res %>%
   theme(axis.text.x = element_text(angle = 25))
 ```
 
-#### 
+# Part IV
+
+Test the corpus without removing suscpicious authors.
+
+## Load corpus
+
+```{r, include=FALSE, echo=FALSE}
+corpus <- readRDS("../../data/corpus_tokenized.rds")
+
+unique(corpus$author)
+
+corpus_tokenized <- corpus %>% 
+  # combine two Diderot's samples to one
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) 
+
+glimpse(corpus_tokenized)
+
+# total number of tokens by each author, two samples from Diderot
+corpus_tokenized %>% 
+  count(author, sort = T) 
+
+rm(corpus)
+```
+
+Load problems
+
+```{r, include=FALSE, echo=FALSE}
+# editions data
+
+l <- list.files(path = "../../data/test_fragments/",
+                pattern = "^ed",
+                full.names = T)
+
+ed <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$")) %>% 
+  filter(!word %in% c("changed", "appeared", "unchanged"))
+
+head(ed)
+
+
+# pencil / ink data
+
+l <- list.files(path = "../../data/test_fragments/",
+                pattern = "^ink|^pencil",
+                full.names = T
+                )
+
+ink_pencil <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$")) %>% 
+  filter(!word %in% c("changed", "appeared", "unchanged"))
+
+# likely Diderot's book chunks from FV recombination
+l <- list.files(path = "../../data/test_fragments/",
+                pattern = "^fr",
+                full.names = T
+                )
+
+diderot <- tibble(
+  path = l,
+  author = str_remove_all(l, "\\.\\./\\.\\./data/test_fragments//|\\.txt"),
+  title = "",
+  text = sapply(path, read_file)
+) %>% 
+  mutate(text = str_replace_all(text, "'", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  filter(!str_detect(word, "^\\d+$")) %>% 
+  filter(!word %in% c("changed", "appeared", "unchanged"))
+
+head(diderot)
+```
+
+```{r, include=FALSE}
+# var needed for diy fn
+str_dev_words <- c("changed")
+```
+
+## Run GI loop
+
+### Ed corpus
+
+```{r}
+ed_corpus <- rbind(corpus_tokenized, ed)
+```
+
+```{r}
+titles <- unique(ed$author)
+titles
+```
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+for (j in 1:length(titles)) {
+  
+  t <- titles[j]
+
+  imp_res <- vector(mode = "list")
+  
+  counter <- 0
+  
+  for (i in 1:50) {
+    
+    ed_corpus <- rbind(corpus_tokenized, ed %>% filter(author == t))
+    
+    # create samples for each trial
+    sample_independent_opt(
+      tokenized_df = ed_corpus, 
+      n_samples = 2, 
+      sample_size = 2000) # only 2k words in sample
+    
+    # build doc-term matrix from the samples in the corpus_sampled folder
+    data = diy_stylo(mfw = 200, 
+                      feature = "word",
+                      n_gram = 1)
+    
+    # grep("ed", rownames(data))
+    
+    # test each of the true FV-L1 sets
+    for (s in c(13, 14)) {
+      
+      # run imposters test
+      r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
+                     test = data[c(s),], # test one of the samples against the others
+                     features = 0.5, # test 50% of the features in each trial
+                     iterations = 100,
+                     distance = "wurzburg"
+                     )
+      
+      # count iterations
+      counter <- counter + 1
+      
+      # store results
+      
+      imp_res[[counter]] <- tibble(candidate = names(r),
+                                   proportion = r)
+      
+      print(counter)
+    }
+    
+  }
+  
+  fh <- paste0("imp_res/1_add_res/", t, ".rds")
+  
+  saveRDS(imp_res, file = fh)
+  
+}
+
+```
+
+### Pencil & ink & sauvage
+
+```{r}
+# select test texts from the corpus
+pencil_ink_corpus <- rbind(ink_pencil, corpus_tokenized)
+
+# select test texts from the corpus
+diderot_corpus <- rbind(diderot %>% filter(author == "fr_sauvage"), corpus_tokenized)
+```
+
+Pencil
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c("ink_melanges"#, 
+                                              #"pencil_pensees_detachees"
+                                               )),
+                       n_samples = 2,
+                       sample_size = 5000)
+
+dtm <- diy_stylo(
+  folder = "corpus_sampled/",
+  mfw = 200,
+  drop_words = F)
+
+# dim(dtm)
+
+grep("pencil", rownames(dtm))
+
+imp_res <- vector(mode = "list")
+r <- NULL
+counter <- 0
+
+for (i in 1:50) {
+  
+  # create samples for each trial
+  sample_independent_opt(
+    tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c("ink_melanges"#, "pencil_pensees_detachees"
+                                               )), 
+    n_samples = 2, 
+    sample_size = 5000)
+  
+  # build doc-term matrix from the samples in the corpus_sampled folder
+  data = diy_stylo(mfw = 200, 
+                    feature = "word",
+                    n_gram = 1)
+  
+  # test each of the true FV-L1 sets
+  for (s in c(25, 26)) {
+    
+    # run imposters test
+    r <- imposters(reference.set = data[-c(25, 26),], # remove test data from the ref
+                   test = data[c(s),], # test one of the samples against the others
+                   features = 0.5, # test 50% of the features in each trial
+                   iterations = 100,
+                   distance = "wurzburg"
+                   )
+    
+    # count iterations
+    counter <- counter + 1
+    
+    # store results
+    
+    imp_res[[counter]] <- tibble(candidate = names(r),
+                                 proportion = r)
+    
+    print(counter)
+  }
+  
+}
+
+saveRDS(imp_res, "imp_res/1_add_res/impr_pencil.rds")
+```
+
+Plot
+
+```{r}
+imp_res <- readRDS("imp_res/1_add_res/impr_pencil.rds")
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  ggplot(aes(x = reorder(candidate, - proportion),
+  y = proportion)) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Pensées détachées", x = "") +
+  theme(axis.text.x = element_text(angle = 25))
+```
+
+Ink
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c(#"ink_melanges",
+                           #"ink_melanges_not-in-pencil",
+                                               "pencil_pensees_detachees"
+                                               )),
+                       n_samples = 2,
+                       sample_size = 5000)
+
+dtm <- diy_stylo(
+  folder = "corpus_sampled/",
+  mfw = 200,
+  drop_words = F)
+
+#dim(dtm)
+
+grep("ink", rownames(dtm))
+
+imp_res <- vector(mode = "list")
+r <- NULL
+counter <- 0
+
+for (i in 1:50) {
+  
+  # create samples for each trial
+  sample_independent_opt(
+    tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c(# "ink_melanges"
+                           #"ink_melanges_not-in-pencil",  
+                           "pencil_pensees_detachees"
+                                               )), 
+    n_samples = 2, 
+    sample_size = 5000)
+  
+  # build doc-term matrix from the samples in the corpus_sampled folder
+  data = diy_stylo(mfw = 200, 
+                    feature = "word",
+                    n_gram = 1)
+  
+  # test each of the true FV-L1 sets
+  for (s in c(15, 16)) {
+    
+    # run imposters test
+    r <- imposters(reference.set = data[-c(15, 16),], # remove test data from the ref
+                   test = data[c(s),], # test one of the samples against the others
+                   features = 0.5, # test 50% of the features in each trial
+                   iterations = 100,
+                   distance = "wurzburg"
+                   )
+    
+    # count iterations
+    counter <- counter + 1
+    
+    # store results
+    
+    imp_res[[counter]] <- tibble(candidate = names(r),
+                                 proportion = r)
+    
+    print(counter)
+  }
+  
+}
+
+saveRDS(imp_res, "imp_res/1_add_res/impr_ink.rds")
+
+```
+
+```{r, echo=FALSE}
+imp_res <- readRDS("imp_res/1_add_res/impr_ink.rds")
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  ggplot(aes(x = reorder(candidate, - proportion),
+  y = proportion)) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Mélanges (ink)", x = "") +
+  theme(axis.text.x = element_text(angle = 25))
+```
+
+Sauvage
+
+```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
+
+sample_independent_opt(tokenized_df = diderot_corpus %>% 
+                         filter(!author %in% c("fr_51-55-72-40", 
+                                               "fr_on_russia-china"#, 
+                                               #"fr_sauvage"
+                                               )),
+                       n_samples = 2,
+                       sample_size = 4500)
+
+dtm <- diy_stylo(
+  folder = "corpus_sampled/",
+  mfw = 200,
+  drop_words = F)
+
+#dim(dtm)
+
+grep("fr_", rownames(dtm))
+
+imp_res <- vector(mode = "list")
+
+counter <- 0
+
+for (i in 1:50) {
+  
+  # create samples for each trial
+  sample_independent_opt(
+    tokenized_df = diderot_corpus %>% 
+                         filter(!author %in% c("fr_51-55-72-40", 
+                                               "fr_on_russia-china"#, 
+                                               #"fr_sauvage"
+                                               )), 
+    n_samples = 2, 
+    sample_size = 4500)
+  
+  # build doc-term matrix from the samples in the corpus_sampled folder
+  data = diy_stylo(mfw = 200, 
+                    feature = "word",
+                    n_gram = 1)
+  
+  # test each of the true FV-L1 sets
+  for (s in c(13, 14)) {
+    
+    # run imposters test
+    r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
+                   test = data[c(s),], # test one of the samples against the others
+                   features = 0.5, # test 50% of the features in each trial
+                   iterations = 100,
+                   distance = "wurzburg"
+                   )
+    
+    # count iterations
+    counter <- counter + 1
+    
+    # store results
+    
+    imp_res[[counter]] <- tibble(candidate = names(r),
+                                 proportion = r)
+    
+    print(counter)
+  }
+  
+}
+
+saveRDS(imp_res, "imp_res/1_add_res/impr_sauvage.rds")
+```
+
+```{r, echo=FALSE}
+imp_res <- readRDS("imp_res/1_add_res/impr_sauvage.rds")
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  ggplot(aes(x = reorder(candidate, - proportion),
+  y = proportion)) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto the fragment 'Les avantages de la vie sauvage'", x = "") +
+  theme(axis.text.x = element_text(angle = 25))
+
+
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one 
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  filter(candidate %in% c("Diderot", "Pechmeja", "Morellet", "Meister", "Rivière", "Condorcet", "dHolbach", "Saint-Lambert",  "Baudeau")) %>% 
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto the fragment 'Les avantages de la vie sauvage'", x = "Candidates (selected)", y = "Proportion") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 12),
+        legend.position = "None"
+        )
+
+# ggsave("../../hdi_diderot/scr/plots_paper/fig_4-a.png",
+#       plot = last_plot(), dpi = 300, bg = "white",
+#       height = 5, width = 8)
+```

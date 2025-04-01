@@ -1,0 +1,338 @@
+---
+title: "06_ngrams"
+format: html
+editor: visual
+---
+
+## BDI: ngrams
+
+This notebook uses character 4grams as features for BDI runs.
+
+## Load pckg & data
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+library(MetBrewer)
+library(cowplot)
+theme_set(theme_minimal())
+```
+
+Ref corpus with 2000 words chunks
+
+```{r}
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
+
+glimpse(corpus)
+```
+
+```{r}
+corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>% 
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  
+  # recalculate chunks
+  mutate(chunk_num_2 = floor(as.numeric(chunk_num)/2)) %>% 
+  mutate(tag = paste0(chunk_num_2, "__", author, "_", work)) 
+
+# last 1k chunks (to be removed, 79 chunks)
+x <- corpus %>% 
+  group_by(tag) %>% 
+  count(chunk_num_2, sort = T) %>% 
+  filter(n < 2) %>% 
+  ungroup() %>% 
+  pull(tag)
+
+head(x)
+
+corpus <- corpus %>% 
+  # remove chunks with less then 2k words
+  select(-chunk_num_2) %>% 
+  filter(!tag %in% x) %>% 
+  mutate(chunk_num = str_extract(tag, "^\\d+"))
+  
+head(corpus) # in this corpus each 2k chunk = 2 rows
+
+rm(x)
+```
+
+### FP
+
+```{r}
+# taking FP and ed1780 as there should be at least two works of the presumable author
+fp1 <- list.files(path = "../../data/test_fragments/",
+                       pattern = "FP|ed1780", 
+                       full.names = T)
+
+fp1
+
+fp <- tibble(
+  path = fp1,
+  title = fp1,
+  text = sapply(path, read_file)
+) %>% 
+  mutate(title = str_remove_all(title, "^\\.\\./\\.\\./data/test_fragments//|\\.txt"))
+
+str(fp)
+```
+
+Cleaning & transforming to chunks
+
+```{r}
+# clean ' and search for &
+# remove "appeared|changed|unchanged"
+
+fp_tokens <- fp %>% 
+  # replace ' and - with \s
+  mutate(text_cln = str_replace_all(text, "'|-|_", " "),
+         # replace newlines
+         text_cln = str_replace_all(text_cln, "\\r|\\n", "  "),
+         # lowercase
+         text_cln = sapply(text_cln, tolower)) %>% #str
+  # remove raw texts & paths
+  select(-text, -path) %>% 
+  rename(text = text_cln) %>% 
+  
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  
+  # remove working tags
+  filter(!word %in% c("appeared", "changed", "unchanged")) %>% 
+  # remove digits
+  filter(!str_detect(word, "^\\d*$")) 
+
+head(fp_tokens)
+
+fp_chunks <- fp_tokens %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /2000)) %>% 
+  ungroup()
+
+head(fp_chunks)
+
+# find chunks with less than 1000 words
+x <- fp_chunks %>% 
+  group_by(title, id_group) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n < 2000) %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) 
+
+x # small chunks
+
+fp_chunks <- fp_chunks %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) %>% 
+  # remove shorter chunks
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # concat text in each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup() %>% 
+  # rename chunks (_ to -)
+  mutate(chunk_id = str_replace_all(chunk_id, "_", "-"))
+
+head(fp_chunks)
+
+
+rm(fp, fp1, fp_tokens, x)
+
+# count number of chunks
+fp_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_id"), sep = "--") %>% 
+  count(title)
+
+
+# transform to BDI format
+fp1_chunks <- fp_chunks %>% 
+  separate(col = chunk_id, into = c("work", "chunk_num"), sep = "--") %>% 
+  mutate(author = "HDI") %>% 
+  select(author, work, chunk_num, text) %>% 
+  mutate(tag = paste0(chunk_num, "__", author, "_", work))
+
+head(fp1_chunks)
+
+rm(fp_chunks)
+```
+
+Merge
+
+```{r}
+raw_corpus <- rbind(corpus, fp1_chunks)
+```
+
+```{r}
+glimpse(raw_corpus)
+```
+
+### Preproc
+
+#### cut char ngrams
+
+```{r}
+ngram_corpus <- raw_corpus %>% 
+  # some additional cleaning from punct and digits before ngram count
+  mutate(text = str_replace_all(text, "[[:punct:]]|\\d", " ")) %>% 
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  group_by(author, work, chunk_num, tag) %>% 
+  mutate(text = paste0(word, collapse = " ")) %>% 
+  ungroup() %>% 
+  select(-word) %>% 
+  distinct() %>% 
+  
+  # replace space with _
+  mutate(text = str_replace_all(text, "\\s", "_")) %>% 
+  # cut
+  unnest_character_shingles(input = text, output = ngram, n = 4, 
+                            strip_non_alphanum = FALSE) 
+
+head(ngram_corpus)
+```
+
+MF ngrams
+
+```{r}
+ngram_corpus %>% 
+  count(ngram, sort = T) %>% 
+  head(20)
+```
+
+#### count freq & ranks
+
+```{r}
+# total n of ngrams obtained
+total <- nrow(ngram_corpus)
+
+# check ranks
+ranks <- ngram_corpus %>% 
+  count(ngram, sort = T) %>% 
+  mutate(rel_freq = (n / total) * 100 ) %>% 
+  head(500) 
+
+# head(ranks, 10)
+
+# set number of mfw
+mfn200 <- ranks$ngram[1:200]
+mfn500 <- ranks$ngram[1:500]
+
+head(mfn200)
+tail(mfn500)
+```
+
+Number of ngrams in each chunk
+
+```{r}
+n_ngram_chunk <- ngram_corpus %>% 
+  count(tag) %>% 
+  rename(total_ngram = n)
+
+head(n_ngram_chunk)
+```
+
+Relative frequencies
+
+mfn 200
+
+```{r}
+# calculate relative frequencies in each chunk
+rfreq <- ngram_corpus %>% 
+  # filter MFN
+  filter(ngram %in% mfn200) %>% 
+  # count words in each chunk
+  group_by(tag) %>% # in this case tag = 2 1000k chunks
+  count(ngram, sort = T) %>% 
+  ungroup() %>% 
+  
+  # attach n of ngrams in each chunk
+  left_join(n_ngram_chunk, by = "tag") %>% 
+  
+  # calculate relative freq
+  mutate(rel_freq = n/total_ngram * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n, -total_ngram) %>% 
+  pivot_wider(names_from = ngram, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "06_tests/fp1/FP1_2000_200mfn_rfreq.csv", 
+          row.names = F)
+```
+
+mfn 500
+
+```{r}
+# calculate relative frequencies in each chunk
+rfreq <- ngram_corpus %>% 
+  # filter MFN
+  filter(ngram %in% mfn500) %>% 
+  # count words in each chunk
+  group_by(tag) %>% # in this case tag = 2 1000k chunks
+  count(ngram, sort = T) %>% 
+  ungroup() %>% 
+  
+  # attach n of ngrams in each chunk
+  left_join(n_ngram_chunk, by = "tag") %>% 
+  
+  # calculate relative freq
+  mutate(rel_freq = n/total_ngram * 100) %>% 
+  # transform to wide matrix-like table
+  select(-n, -total_ngram) %>% 
+  pivot_wider(names_from = ngram, values_from = rel_freq, values_fill = 0) %>% 
+  arrange(-desc(tag))
+
+rfreq[1:5, 1:5]
+
+dim(rfreq)
+
+#################### save
+# extract metadata back as separate columns
+meta_cols <- rfreq %>% 
+  select(tag) %>% 
+  separate(remove = FALSE, col = tag, into = c("chunk_num", "othr"), sep = "__") %>% 
+  separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+  select(work, author, chunk_num, tag)
+
+head(meta_cols)
+
+# attach metadata cols to word freqs
+rfreq <- meta_cols %>% 
+  left_join(rfreq, by = "tag")
+
+dim(rfreq)
+
+write.csv(rfreq, "06_tests/fp1/FP1_2000_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+### viz
+
+```{r}
+
+```

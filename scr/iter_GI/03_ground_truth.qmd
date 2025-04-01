@@ -540,7 +540,7 @@ nb: Results for smaller sample are worse.
 
 Here a random work for each author is taken and renamed as "masked_Author", after that GI is performed in order to see, if the work will be attributed to the true author (same settings as in actual experiments).
 
-### selection of authors & works 
+### selection of authors & works
 
 ```{r}
 unique(corpus_tokenized$title)[1:10]
@@ -1042,7 +1042,7 @@ for (i in 1:length(works)) {
   
   corpus_m <- corpus_tokenized %>% 
     # filter out Naigeon
-    filter(author != "Naigeon") %>% 
+    filter(!author %in% c("Naigeon", "Marmontel", "Meister")) %>% 
     
     # the function is grouping by author, so we rewrite the author of this 
     # one work as an unknown author
