@@ -277,6 +277,42 @@ dtm <- diy_stylo(
 grep("ed", rownames(dtm))
 ```
 
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               #"ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780"
+                                               )),
+                     sample_size = 4000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ed1770-nch-nch_optimise_list_w.rds")
+```
+
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 imp_res <- vector(mode = "list")
 
@@ -327,11 +363,16 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_1770_nch74_nch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_nch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_1770_nch74_nch80.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1770_nch74_nch80.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1770-nch-nch_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one 
@@ -339,6 +380,14 @@ imp_res %>%
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
   geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)", x = "Candidates", y = "Proportion") +
   theme(axis.text.x = element_text(angle = 25))
@@ -354,7 +403,12 @@ imp_res %>%
   ggplot(aes(x = reorder(candidate, proportion),
   y = proportion)) + 
   geom_boxplot(aes(fill = gr)) + 
-  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
@@ -364,9 +418,9 @@ imp_res %>%
         legend.position = "None"
         )
 
-#ggsave("../../hdi_diderot/scr/plots_paper/fig_2-a.png",
-#       plot = last_plot(), dpi = 300, bg = "white",
-#       height = 5, width = 8)
+ggsave("plots/fig_2-a.png",
+       plot = last_plot(), dpi = 300, bg = "white",
+       height = 5, width = 8)
 ```
 
 This is the strongest d'Holbach authorship signal obtained from this data, the algorithm is quite sure about his authorship for the FV fragments of the earliest fragments (appeared ed. 1770 and remained unchanged in later editions).
@@ -394,6 +448,44 @@ dtm <- diy_stylo(
 grep("ed", rownames(dtm))
 
 rownames(dtm)
+```
+
+# to run
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               #"ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780"
+                                               )),
+                     sample_size = 2500,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ed1770-CH-nch_optimise_list_w.rds")
 ```
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
@@ -446,24 +538,76 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_1770_ch74_nch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_nch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_1770_ch74_nch80.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1770_ch74_nch80.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1770-CH-nch_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed in the ed. of 1774 and not changed in the ed. of 1780 ", x = "") +
   theme(axis.text.x = element_text(angle = 25))
 ```
 
 #### 1770-ch1774-ch1780
+
+# to run
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(ed_corpus %>% 
+                         filter(!author %in% c(# "ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780"
+                                               )),
+                     sample_size = 5000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ed1770-CH-CH_optimise_list_w.rds")
+
+```
 
 ```{r, eval=FALSE, include=FALSE, echo=FALSE}
 sample_independent_opt(tokenized_df = ed_corpus %>% 
@@ -538,18 +682,31 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_1770_ch74_ch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_ch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_1770_ch74_ch80.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1770_ch74_ch80.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1770-CH-CH_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed twice in the ed. of 1774 and that of 1780 ", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -558,6 +715,45 @@ imp_res %>%
 #### 1770-nch1774-ch1780
 
 n words = 18 247
+
+# to run
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               #"ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780"
+                                               )),
+                     sample_size = 5000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ed1770-nch-CH_optimise_list_w.rds")
+
+```
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
@@ -631,18 +827,31 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_1770_nch74_ch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_ch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_1770_nch74_ch80.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1770_nch74_ch80.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1770-nch-CH_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was not changed in the ed. of 1774 and changed in the ed. of 1780", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -651,6 +860,42 @@ imp_res %>%
 #### 1774-nch1780
 
 n words = 4 821
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               #"ed1774_nch1780", 
+                                               "ed1780"
+                                               )),
+                     sample_size = 2000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ed1774-nch-optimise_list_w.rds")
+```
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
@@ -724,18 +969,32 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_1774_nch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1774_nch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_1774_nch80.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1774_nch80.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1774-nch-optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and not changed in the ed. of 1780",
        x = "") +
@@ -744,6 +1003,46 @@ imp_res %>%
 ```
 
 #### 1774-ch1780
+
+# to run
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               #"ed1774_CH1780", 
+                                               "ed1774_nch1780", 
+                                               "ed1780"
+                                               )),
+                     sample_size = 5000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ed1774-CH_optimise_list_w.rds")
+
+
+```
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
@@ -817,18 +1116,32 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_1774_ch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1774_ch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_1774_ch80.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1774_ch80.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1774-CH_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and changed in the ed. of 1780",
        x = "") +
@@ -838,6 +1151,42 @@ imp_res %>%
 #### 1780
 
 n words = 86k
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(ed_corpus %>% 
+                         filter(!author %in% c("ed1770_CH1774_CH1780", 
+                                               "ed1770_CH1774_nch1780", 
+                                               "ed1770_nch1774_CH1780", 
+                                               "ed1770_nch1774_nch1780", 
+                                               "ed1774_CH1780", 
+                                               "ed1774_nch1780"#, 
+                                               #"ed1780"
+                                               )),
+                     sample_size = 10000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ed1780-optimise_list_w.rds")
+```
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
@@ -911,18 +1260,32 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_1780.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1780.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_1780.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1780.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1780-optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1780", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -946,20 +1309,53 @@ pencil_ink_corpus <- rbind(ink_pencil, corpus_tokenized)
 
 # unique(pencil_ink_corpus$author)
 # 
-# pencil_ink_corpus %>% 
-#   filter(author %in% c("ink_melanges", "pencil_pensees_detachees")) %>% 
-#   count(author)
+pencil_ink_corpus %>%
+  filter(author %in% c("ink_melanges", "pencil_pensees_detachees")) %>%
+  count(author)
 ```
 
 ### Imposters
 
 #### Pensées détachées (pencil)
 
+# to run
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c("ink_melanges"#,
+                                              #"pencil_pensees_detachees"
+                                               )), 
+                         n_samples = 2, 
+                         sample_size = 5000, 
+                         text_var = "word")
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(25, 26),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/pencil_optimise_list_w.rds")
+
+```
+
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
 sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
                          filter(!author %in% c("ink_melanges"#, 
-                                               #"ink_melanges_not-in-pencil"#,
                                               #"pencil_pensees_detachees"
                                                )),
                        n_samples = 2,
@@ -984,7 +1380,7 @@ for (i in 1:50) {
   sample_independent_opt(
     tokenized_df = pencil_ink_corpus %>% 
                          filter(!author %in% c("ink_melanges"#,
-                                               #"ink_melanges_not-in-pencil"#, "pencil_pensees_detachees"
+                                               #"pencil_pensees_detachees"
                                                )), 
     n_samples = 2, 
     sample_size = 5000)
@@ -1018,18 +1414,31 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_pencil.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_pencil.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_pencil.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_pencil.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/pencil_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Pensées détachées", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -1037,11 +1446,44 @@ imp_res %>%
 
 #### Mélanges (ink)
 
+# to run
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
+                         filter(!author %in% c(#"ink_melanges"#,
+                                              "pencil_pensees_detachees"
+                                               )), 
+                         n_samples = 2, 
+                         sample_size = 5000, 
+                         text_var = "word")
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(15, 16),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/ink_optimise_list_w.rds")
+
+```
+
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
 sample_independent_opt(tokenized_df = pencil_ink_corpus %>% 
                          filter(!author %in% c(#"ink_melanges",
-                           #"ink_melanges_not-in-pencil",
                                                "pencil_pensees_detachees"
                                                )),
                        n_samples = 2,
@@ -1065,8 +1507,7 @@ for (i in 1:50) {
   # create samples for each trial
   sample_independent_opt(
     tokenized_df = pencil_ink_corpus %>% 
-                         filter(!author %in% c(# "ink_melanges"
-                           #"ink_melanges_not-in-pencil",  
+                         filter(!author %in% c(# "ink_melanges",
                            "pencil_pensees_detachees"
                                                )), 
     n_samples = 2, 
@@ -1101,18 +1542,31 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_ink.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_ink.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_ink.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_ink.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ink_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Mélanges (ink)", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -1127,7 +1581,13 @@ imp_res %>%
   ggplot(aes(x = reorder(candidate, proportion),
   y = proportion)) + 
   geom_boxplot(aes(fill = gr)) + 
-  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
@@ -1137,9 +1597,9 @@ imp_res %>%
         legend.position = "None"
         )
 
-ggsave("../../hdi_diderot/scr/plots_paper/fig_3-a.png",
-      plot = last_plot(), dpi = 300, bg = "white",
-      height = 5, width = 8)
+# ggsave("../../hdi_diderot/scr/plots_paper/fig_3-a.png",
+#       plot = last_plot(), dpi = 300, bg = "white",
+#       height = 5, width = 8)
 ```
 
 ### Current conclusions
@@ -1237,11 +1697,11 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_rus-china.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_rus-china.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_rus-china.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_rus-china.rds")
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
@@ -1255,6 +1715,40 @@ imp_res %>%
 ```
 
 #### Sauvage
+
+# to run
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(tokenized_df = diderot_corpus %>% 
+                         filter(!author %in% c("fr_51-55-72-40", 
+                                               "fr_on_russia-china"#, 
+                                               #"fr_sauvage"
+                                               )),
+                     sample_size = 4500,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/0_main_res/sauvage_optimise_list_w.rds")
+```
 
 ```{r, warning=FALSE, message=FALSE, eval=FALSE, include=FALSE, echo=FALSE}
 
@@ -1320,18 +1814,31 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_sauvage.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_sauvage.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_sauvage.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_sauvage.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/sauvage_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   ggplot(aes(x = reorder(candidate, - proportion),
   y = proportion)) +
-  geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto the fragment 'Les avantages de la vie sauvage'", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -1346,7 +1853,13 @@ imp_res %>%
   ggplot(aes(x = reorder(candidate, proportion),
   y = proportion)) + 
   geom_boxplot(aes(fill = gr)) + 
-  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
@@ -1396,7 +1909,7 @@ for (i in 1:50) {
                                                "fr_sauvage"
                                                )),
                        n_samples = 2,
-                       sample_size = 2400)
+                       sample_size = 2300)
   
   # build doc-term matrix from the samples in the corpus_sampled folder
   data = diy_stylo(mfw = 200, 
@@ -1427,11 +1940,11 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/impr_fr-51-55-72-40.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_fr-51-55-72-40.rds")
 ```
 
-```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/impr_fr-51-55-72-40.rds")
+```{r, echo=FALSE, eval=FALSE}
+imp_res <- readRDS("imp_res/0_main_res/impr_fr-51-55-72-40.rds")
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
@@ -1529,7 +2042,7 @@ diderot <- tibble(
 head(diderot)
 ```
 
-```{r, include=FALSE}
+```{r, include=FALSE, echo=FALSE}
 # var needed for diy fn
 str_dev_words <- c("changed")
 ```
@@ -1538,9 +2051,11 @@ str_dev_words <- c("changed")
 
 ### Ed corpus
 
-```{r}
+```{r, include=FALSE, echo=FALSE}
 ed_corpus <- rbind(corpus_tokenized, ed)
 ```
+
+Groups of fragments based on editorial history:
 
 ```{r}
 titles <- unique(ed$author)
@@ -1606,9 +2121,86 @@ for (j in 1:length(titles)) {
 
 ```
 
+### Plots
+
+```{r, include=FALSE, eval=FALSE, echo=FALSE}
+fl <- list.files(path = "imp_res/1_add_res/",
+                 pattern = ".rds",
+                 full.names = TRUE)
+
+author_res <- tibble(path = fl,
+                     title = str_remove_all(
+                       path, "imp_res/1_add_res//|\\.rds"),
+                     author = title) 
+
+glimpse(author_res)
+```
+
+```{r, include=FALSE, eval=FALSE, echo=FALSE}
+plt <- function(res, author, work) {
+  imp_res %>% 
+  bind_rows() %>% 
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  #filter(candidate %in% c("Diderot", "Meister", "Condorcet", "dHolbach", "Deleyre")) %>% 
+  mutate(gr = ifelse(candidate == author, "a", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, -proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  #geom_boxplot(fill = "darkcyan", alpha = 0.6) +
+  theme_bw() + 
+  # coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = paste0("Proportion of cases where a sample from an author was the closest one\nto ", work),
+       x = "Candidates", y = "Proportion") +
+  theme(axis.text.x = element_text(angle = 25),
+        axis.text = element_text(size = 10),
+        legend.position = "None"
+        )
+}
+```
+
+```{r, include=FALSE, eval=FALSE, echo=FALSE}
+unique_authors <- unique(author_res$author)
+unique_authors
+
+plots <- list()
+a <- NULL
+w <- NULL
+
+for (i in 1:length(unique_authors)) {
+  
+  # select author
+  a = unique_authors[i]
+  
+  # extract the author's results from all
+  author_subset <- author_res %>% filter(author == a)
+  
+  # for each work & its imposter results
+  for (j in 1:nrow(author_subset)) {
+    
+    # select work title
+    w <- author_subset$title[j]
+    # select path
+    fh <- author_subset$path[j]
+    
+    # read rds results for this work
+    imp_res <- readRDS(fh)
+    
+    # create a plot and store it in a list
+    plt1 <- plt(imp_res, author = "Diderot", work = w)
+    
+  }
+  
+  pltfh <- paste0("imp_res/1_plots_additional/", a, ".png")
+  ggsave(filename = pltfh, plot = plt1,
+         height = 7, width = 9, bg = "white")
+  
+}
+```
+
 ### Pencil & ink & sauvage
 
-```{r}
+```{r, include=FALSE, eval=FALSE, echo=FALSE}
 # select test texts from the corpus
 pencil_ink_corpus <- rbind(ink_pencil, corpus_tokenized)
 
@@ -1656,10 +2248,10 @@ for (i in 1:50) {
                     n_gram = 1)
   
   # test each of the true FV-L1 sets
-  for (s in c(25, 26)) {
+  for (s in c(31, 32)) {
     
     # run imposters test
-    r <- imposters(reference.set = data[-c(25, 26),], # remove test data from the ref
+    r <- imposters(reference.set = data[-c(31, 32),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
                    features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
@@ -1684,7 +2276,7 @@ saveRDS(imp_res, "imp_res/1_add_res/impr_pencil.rds")
 
 Plot
 
-```{r}
+```{r, echo=FALSE}
 imp_res <- readRDS("imp_res/1_add_res/impr_pencil.rds")
 
 imp_res %>%

@@ -1035,10 +1035,10 @@ a <- NULL
 
 str_dev_words <- c("changed") # word for removal from MFW vector
 
-for (i in 1:length(works)) {
+for (j in 1:length(works)) {
   
   # select one work
-  w <- works[i]
+  w <- works[j]
   
   corpus_m <- corpus_tokenized %>% 
     # filter out Naigeon
@@ -1068,11 +1068,11 @@ for (i in 1:length(works)) {
     
     # grep("masked", rownames(data))
     
-    # 23 & 24 are positions of a masked author
-    for (s in c(23, 24)) {
+    # NB change positions of a masked author
+    for (s in c(21, 22)) {
       
       # run imposters test
-      r <- imposters(reference.set = data[-c(23, 24),], # remove test data from the ref
+      r <- imposters(reference.set = data[-c(21, 22),], # remove test data from the ref
                      test = data[c(s),], # test one of the samples against the others
                      features = 0.5, # test 50% of the features in each trial
                      iterations = 100,
@@ -1093,7 +1093,7 @@ for (i in 1:length(works)) {
   }
   
   # write results as the name of the works
-  fh = paste0("imp_res/diderot_naigeon/", w, "-wo-Naigeon.rds")
+  fh = paste0("imp_res/diderot_naigeon/", w, "-wo-Naigeon-Meister-Marmontel.rds")
   
   saveRDS(imp_res, file = fh)
   
@@ -1104,12 +1104,12 @@ Plots
 
 ```{r}
 fl <- list.files(path = "imp_res/diderot_naigeon/",
-                 pattern = "-wo-Naigeon.rds",
+                 pattern = "-wo-Naigeon-Meister-Marmontel.rds",
                  full.names = TRUE)
 
 author_res <- tibble(path = fl,
                      title = str_remove_all(
-                       path, "imp_res/diderot_naigeon//|\\-wo-Naigeon.rds"),
+                       path, "imp_res/diderot_naigeon//|\\-wo-Naigeon-Meister-Marmontel.rds"),
                      author = str_remove(str_extract(title, "^\\w+\\s?\\w?\\w?_"), "_")) %>% 
   mutate(author = str_replace(author, "Diderot II", "Diderot"))
 
@@ -1146,7 +1146,7 @@ for (j in 1:nrow(author_subset)) {
 # for each author: expand the plot list & store the plots
 plot_grid(plots[[1]], plots[[2]], plots[[3]], plots[[4]],  ncol = 1)
   
-pltfh <- paste0("imp_res/plots__authors_vs_all/", a, "_wo-Naigeon.png")
+pltfh <- paste0("imp_res/plots__authors_vs_all/", a, "_wo-Naigeon-M-M.png")
 ggsave(filename = pltfh, plot = last_plot(),
          height = 25, width = 7, bg = "white")
 ```

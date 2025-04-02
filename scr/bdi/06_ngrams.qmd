@@ -60,7 +60,7 @@ head(corpus) # in this corpus each 2k chunk = 2 rows
 rm(x)
 ```
 
-### FP
+## FP
 
 ```{r}
 # taking FP and ed1780 as there should be at least two works of the presumable author
@@ -333,6 +333,682 @@ write.csv(rfreq, "06_tests/fp1/FP1_2000_500mfn_rfreq.csv",
 
 ### viz
 
-```{r}
+#### 200 mfn
 
+```{r}
+# list csv results
+fl <- list.files(path = "06_tests/fp1/mfn200/", pattern = ".csv", full.names = T)
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "06_tests/fp1/mfn200//|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors (2k chunks, 200 MF character 4-grams)")
+
+ggsave(filename = "06_tests/fp1/fp1_2k_200MFN.png", plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+#### 500 mfn
+
+```{r}
+# list csv results
+fl <- list.files(path = "06_tests/fp1/mfn500/", pattern = ".csv", full.names = T)
+
+new_data <- purrr::map_df(fl, function(x) {
+  mydata <- read.csv(x)
+  mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+  mutate(group = x)
+})
+
+new_data %>% 
+  mutate(group = str_remove_all(group, "06_tests/fp1/mfn500//|\\.csv")) %>% 
+  ggplot(aes(x = bdi, group = group, colour = group, fill = group)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "FP1 vs various authors (2k chunks, 500 MF character 4-grams)")
+
+ggsave(filename = "06_tests/fp1/fp1_2k_500MFN.png", plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+#### % above zero
+
+```{r}
+x <- new_data %>% 
+  mutate(group = str_remove_all(group, "06_tests/fp1/mfn500//|\\.csv")) #%>% 
+  #filter(str_detect(group, "Baudeau|dHolbach|Diderot|Raynal")) 
+
+glimpse(x)
+
+# calculate value above 0 for each run of each group
+x %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) 
+
+# summarise by mean % above 0 for each author
+x %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0))
+```
+
+## Editions
+
+### preproc
+
+Load data
+
+```{r}
+corpus <- readRDS("../../data/bdi/corpus_chunks.rds")
+
+glimpse(corpus)
+```
+
+```{r}
+corpus <- corpus %>% 
+  separate(chunk_id, into = c("chunk_num", "title"), sep = "__") %>% 
+  separate(title, into = c("author", "work"), sep = "_") %>% 
+  select(author, work, chunk_num, text) %>% 
+  # fix Diderot into one set
+  mutate(author = ifelse(author == "Diderot II", "Diderot", author)) %>% 
+  
+  # recalculate chunks
+  mutate(chunk_num_2 = floor(as.numeric(chunk_num)/2)) %>% 
+  mutate(tag = paste0(chunk_num_2, "__", author, "_", work)) 
+
+# last 1k chunks (to be removed, 79 chunks)
+x <- corpus %>% 
+  group_by(tag) %>% 
+  count(chunk_num_2, sort = T) %>% 
+  filter(n < 2) %>% 
+  ungroup() %>% 
+  pull(tag)
+
+head(x)
+
+corpus <- corpus %>% 
+  # remove chunks with less then 2k words
+  select(-chunk_num_2) %>% 
+  filter(!tag %in% x) %>% 
+  mutate(chunk_num = str_extract(tag, "^\\d+"))
+  
+head(corpus) # in this corpus each 2k chunk = 2 rows
+
+rm(x)
+
+
+# prepare for ngram cut
+corpus_n <- corpus %>% 
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  # remove digits & punct inside words
+  mutate(word = str_replace_all(word, "[[:punct:]]", " "),
+         word = str_replace_all(word, "\\d", " ")) %>% 
+  group_by(work, author, chunk_num, tag) %>% 
+  mutate(text = paste(word, collapse = " ")) %>% 
+  select(-word) %>% 
+  distinct() %>% 
+  ungroup() %>% 
+  
+  # remove all unnecessary spaces and merge back
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  group_by(work, author, chunk_num, tag) %>% 
+  mutate(text = paste(word, collapse = "_")) %>% 
+  select(-word) %>% 
+  distinct() %>% 
+  ungroup() 
+
+glimpse(corpus_n)
+```
+
+Load problems
+
+```{r}
+editions <- list.files(path = "../../data/test_fragments/",
+                       pattern = "ed",
+                       full.names = T)
+
+editions
+
+editions <- tibble(
+  path = editions,
+  title = editions,
+  text = sapply(path, read_file)
+) %>% 
+  mutate(title = str_remove_all(title, "^\\.\\./\\.\\./data/test_fragments//|\\.txt"))
+
+str(editions)
+```
+
+```{r}
+# clean ' and search for &
+# remove "appeared|changed|unchanged"
+
+ed_tokens <- editions %>% 
+  # replace ' and - with \s
+  mutate(text_cln = str_replace_all(text, "'|-|_", " "),
+         # replace newlines
+         text_cln = str_replace_all(text_cln, "\\r|\\n", "  "),
+         # lowercase
+         text_cln = sapply(text_cln, tolower)) %>% #str
+  # remove raw texts & paths
+  select(-text, -path) %>% 
+  rename(text = text_cln) %>% 
+  
+  # tokenisation
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  
+  # remove working tags
+  filter(!word %in% c("appeared", "changed", "unchanged")) %>% 
+  # remove digits & punct inside words
+  mutate(word = str_replace_all(word, "[[:punct:]]", " "),
+         word = str_replace_all(word, "\\d", " ")) %>% 
+  group_by(title) %>% 
+  mutate(text = paste(word, collapse = " ")) %>% 
+  select(-word) %>% 
+  distinct() %>% 
+  ungroup() %>% 
+  
+  # remove all unnecessary spaces for the clean tokenization
+  unnest_tokens(input = text, output = word, token = "words")
+
+glimpse(ed_tokens)
+```
+
+```{r}
+ed_chunks <- ed_tokens %>% 
+  group_by(title) %>% 
+  mutate(id = row_number()-1,
+         id_group = floor(id /2000)) %>% 
+  ungroup()
+
+head(ed_chunks)
+
+# find chunks with less than 1000 words
+x <- ed_chunks %>% 
+  group_by(title, id_group) %>% 
+  count() %>% 
+  ungroup() %>% 
+  filter(n < 2000) %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) 
+
+x # small chunks
+
+ed_chunks <- ed_chunks %>% 
+  mutate(chunk_id = paste0(title, "__", id_group)) %>% 
+  # remove shorter chunks
+  filter(!chunk_id %in% x$chunk_id) %>% 
+  
+  # concat text in each chunk
+  select(chunk_id, word) %>% 
+  group_by(chunk_id) %>% 
+  mutate(text = paste(word, collapse = " ")) %>%
+  select(-word) %>%
+  distinct() %>%
+  ungroup() %>% 
+  # rename chunks (_ to -)
+  mutate(chunk_id = str_replace_all(chunk_id, "_", "-"))
+
+head(ed_chunks)
+
+# count number of chunks
+ed_chunks %>% 
+  separate(col = chunk_id, into = c("title", "chunk_id"), sep = "--") %>% 
+  count(title)
+
+rm(editions, ed_tokens, x)
+```
+
+```{r}
+# check data
+ed_chunks$text[3]
+```
+
+Create columns for BDI test & replace spaces with \_
+
+```{r}
+editions_chunks <- ed_chunks %>% 
+  separate(col = chunk_id, into = c("work", "chunk_num"), sep = "--") %>% 
+  mutate(author = "HDI") %>% 
+  mutate(tag = paste0(chunk_num, "__", author, "_", work)) %>% 
+  select(author, work, chunk_num, text, tag) %>% 
+  
+  # remove all unnecessary spaces and merge back with _
+  unnest_tokens(input = text, output = word, token = "words") %>% 
+  group_by(work, author, chunk_num, tag) %>% 
+  mutate(text = paste(word, collapse = "_")) %>% 
+  select(-word) %>% 
+  distinct() %>% 
+  ungroup() 
+
+head(editions_chunks)
+```
+
+#### count ngrams
+
+```{r}
+colnames(corpus_n)
+colnames(editions_chunks)
+
+raw_corpus <- rbind(corpus_n, editions_chunks)
+```
+
+```{r}
+ngram_corpus <- raw_corpus %>% 
+  # cut
+  unnest_character_shingles(input = text, output = ngram, n = 4, 
+                            strip_non_alphanum = FALSE) 
+
+head(ngram_corpus)
+```
+
+```{r}
+# total n of ngrams obtained
+total <- nrow(ngram_corpus)
+
+# check ranks
+ranks <- ngram_corpus %>% 
+  count(ngram, sort = T) %>% 
+  mutate(rel_freq = (n / total) * 100 ) %>% 
+  head(500) 
+
+# head(ranks, 10)
+
+# set number of mfw
+mfn200 <- ranks$ngram[1:200]
+mfn500 <- ranks$ngram[1:500]
+
+head(mfn200)
+tail(mfn500)
+```
+
+```{r}
+n_ngram_chunk <- ngram_corpus %>% 
+  count(tag) %>% 
+  rename(total_ngram = n)
+
+head(n_ngram_chunk)
+```
+
+#### fn for rfreq
+
+```{r}
+count_rfreq <- function(tbl, n_mfn) {
+    ###################### freqs
+  
+  # total words
+  total <- tbl %>% nrow()
+  
+  # check ranks for the 200 MFW
+  ranks <- tbl %>% 
+    count(ngram, sort = T) %>% 
+    mutate(rel_freq = (n / total) * 100 ) %>% 
+    head(500) 
+  
+  # head(ranks, 10)
+  
+  # set MFW number
+  mfn <- ranks$ngram[1:n_mfn]
+  
+  # calculate relative frequencies in each chunk
+  rfreq <- tbl %>% 
+    
+    # filter according to ranks
+    filter(ngram %in% mfn) %>% 
+    # count words in each chunk
+    group_by(tag) %>% 
+    count(ngram, sort = T) %>% 
+    ungroup() %>% 
+    
+    # attach number of ngrams in each chunk
+    left_join(n_ngram_chunk, by = "tag") %>% 
+    
+    # calculate relative freq
+    mutate(rel_freq = n/total_ngram * 100) %>% 
+    # transform to wide matrix-like table
+    select(-n, -total_ngram) %>% 
+    pivot_wider(names_from = ngram, 
+                values_from = rel_freq, values_fill = 0) %>% 
+    arrange(-desc(tag))
+  
+  # rfreq[1:5, 1:5]
+  
+  # dim(rfreq)
+  
+  #################### save
+  # extract metadata back as separate columns (from tag-merged freqs already!)
+  meta_cols <- rfreq %>% 
+    select(tag) %>% 
+    separate(remove = FALSE, col = tag, 
+             into = c("chunk_num", "othr"), sep = "__") %>% 
+    separate(col = "othr", into = c("author", "work"), sep = "_") %>% 
+    select(work, author, chunk_num, tag)
+  
+  # head(meta_cols)
+  
+  # attach metadata cols to word freqs
+  rfreq <- meta_cols %>% 
+    left_join(rfreq, by = "tag")
+  
+  # dim(rfreq)
+  
+  return(rfreq)
+}
+
+```
+
+#### write rfreq csv-s
+
+1770-nch-nch
+
+```{r}
+# remove other problems from the corpus
+t <- ngram_corpus %>% 
+  filter(!work %in% c(#"ed1770-nch1774-nch1780", 
+                      #"ed1770-CH1774-nch1780", 
+                      "ed1770-nch1774-CH1780", 
+                      "ed1770-CH1774-CH1780",  
+                      "ed1774-nch1780", 
+                      "ed1774-CH1780", 
+                      "ed1780")) 
+
+ed1770_nch_nch_rfreq <- count_rfreq(t, n_mfn = 500)
+
+ed1770_nch_nch_rfreq[1:5,1:5]
+
+write.csv(ed1770_nch_nch_rfreq, 
+          "06_tests/editions/ed1770-nch-nch_2k_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+1770-ch-nch
+
+```{r}
+# remove other problems from the corpus
+t <- ngram_corpus %>% 
+  filter(!work %in% c("ed1770-nch1774-nch1780", 
+                      #"ed1770-CH1774-nch1780", 
+                      #"ed1770-nch1774-CH1780", 
+                      "ed1770-CH1774-CH1780",  
+                      "ed1774-nch1780", 
+                      "ed1774-CH1780", 
+                      "ed1780")) 
+
+ed1770_ch_nch_rfreq <- count_rfreq(t, n_mfn = 500)
+
+ed1770_ch_nch_rfreq[1:5,1:5]
+
+write.csv(ed1770_ch_nch_rfreq, 
+          "06_tests/editions/ed1770-ch-nch_2k_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+1770_nch_ch
+
+```{r}
+# remove other problems from the corpus
+t <- ngram_corpus %>% 
+  filter(!work %in% c("ed1770-nch1774-nch1780", 
+                      "ed1770-CH1774-nch1780", 
+                      #"ed1770-nch1774-CH1780", 
+                      #"ed1770-CH1774-CH1780",  
+                      "ed1774-nch1780", 
+                      "ed1774-CH1780", 
+                      "ed1780")) 
+
+ed1770_nch_ch_rfreq <- count_rfreq(t, n_mfn = 500)
+
+ed1770_nch_ch_rfreq[1:5,1:5]
+
+write.csv(ed1770_nch_ch_rfreq, 
+          "06_tests/editions/ed1770-nch-ch_2k_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+1770-ch-ch
+
+```{r}
+# remove other problems from the corpus
+t <- ngram_corpus %>% 
+  filter(!work %in% c("ed1770-nch1774-nch1780", 
+                      "ed1770-CH1774-nch1780", 
+                      "ed1770-nch1774-CH1780", 
+                      #"ed1770-CH1774-CH1780",  
+                      #"ed1774-nch1780", 
+                      "ed1774-CH1780", 
+                      "ed1780")) 
+
+ed1770_ch_ch_rfreq <- count_rfreq(t, n_mfn = 500)
+
+ed1770_ch_ch_rfreq[1:10,1:10]
+
+write.csv(ed1770_ch_ch_rfreq, 
+          "06_tests/editions/ed1770-ch-ch_2k_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+1774-nch
+
+```{r}
+# remove other problems from the corpus
+t <- ngram_corpus %>% 
+  filter(!work %in% c("ed1770-nch1774-nch1780", 
+                      "ed1770-CH1774-nch1780", 
+                      "ed1770-nch1774-CH1780", 
+                      "ed1770-CH1774-CH1780",  
+                      #"ed1774-nch1780", 
+                      #"ed1774-CH1780", 
+                      "ed1780")) 
+
+ed1774_nch_rfreq <- count_rfreq(t, n_mfn = 500)
+
+ed1774_nch_rfreq[1:5,1:5]
+
+write.csv(ed1774_nch_rfreq, 
+          "06_tests/editions/ed1774-nch_2k_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+1774-ch
+
+```{r}
+# remove other problems from the corpus
+t <- ngram_corpus %>% 
+  filter(!work %in% c("ed1770-nch1774-nch1780", 
+                      "ed1770-CH1774-nch1780", 
+                      "ed1770-nch1774-CH1780", 
+                      "ed1770-CH1774-CH1780",  
+                      "ed1774-nch1780"#, 
+                      #"ed1774-CH1780", 
+                      #"ed1780"
+                      )) 
+
+ed1774_ch_rfreq <- count_rfreq(t, n_mfn = 500)
+
+ed1774_ch_rfreq[1:5,1:5]
+
+write.csv(ed1774_ch_rfreq, 
+          "06_tests/editions/ed1774-ch_2k_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+1780
+
+```{r}
+# remove other problems from the corpus
+t <- ngram_corpus %>% 
+  filter(!work %in% c(#"ed1770-nch1774-nch1780", 
+                      "ed1770-CH1774-nch1780", 
+                      "ed1770-nch1774-CH1780", 
+                      "ed1770-CH1774-CH1780",  
+                      "ed1774-nch1780", 
+                      "ed1774-CH1780"#, 
+                      #"ed1780"
+                      )) 
+
+ed1780_rfreq <- count_rfreq(t, n_mfn = 500)
+
+ed1780_rfreq[1:5,1:5]
+
+write.csv(ed1780_rfreq, 
+          "06_tests/editions/ed1780_2k_500mfn_rfreq.csv", 
+          row.names = F)
+```
+
+### viz
+
+#### fn for plots
+
+```{r}
+# make table ready for the ggplot from path=pth
+compile_res <- function(pth, ptrn) {
+  # list csv results
+  fl <- list.files(path = pth, 
+                   pattern = ptrn, full.names = T)
+  
+  new_data <- purrr::map_df(fl, function(x) {
+    mydata <- read.csv(x)
+    mydata %>% pivot_longer(!X, names_to = "run", values_to = "bdi") %>% 
+    mutate(group = x)
+  })
+  
+  return(new_data)
+}
+
+# make plot
+mkplot <- function(plot_data, work) {
+  
+  plot_data %>% 
+    mutate(group = str_remove_all(group, "06_tests/editions/mfn500//|\\.csv")) %>% 
+    ggplot(aes(x = bdi, group = run)) + 
+    geom_density(alpha = 0.15, fill = "darkgreen", colour = "black") + 
+    geom_vline(xintercept=0, lty = 2, colour = "black") + 
+    facet_wrap(~group, ncol=1) + 
+    theme(legend.position = "None") + 
+    labs(title = paste0(work, " vs various authors (2k word chunks, 500 MF char 4grams)"))
+}
+
+# mkplot(x, "ed1770-CH-nch")
+
+# plot with selected authors
+# mk_splot <- function(plot_data, work, authors) {
+#   
+#   plot_data %>% 
+#     mutate(group = str_remove_all(group, "04_tests/tests//|\\.csv")) %>% 
+#     filter(str_detect(group, authors)) %>% 
+#     ggplot(aes(x = bdi, group = run, colour = group, fill = group)) + 
+#     geom_density(alpha = 0.3) + 
+#     geom_vline(xintercept=0, lty = 2, colour = "black") + 
+#     #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+#     facet_wrap(~group, ncol=1) + 
+#     theme(legend.position = "None") + 
+#     labs(title = paste0(work, " vs various authors (2k chunks, 200 MFW)"))
+# }
+
+# e.g.:
+# mk_splot(x, work = "ed1770-CH-nch", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+1770-nch-nch
+
+```{r}
+plt <- compile_res("06_tests/editions/mfn500/", ptrn = "^ed1770-nch-nch")
+
+mkplot(plt, "ed1770-nch-nch")
+
+ggsave(filename = "06_tests/editions/plots/ed1770-nch-nch_2k_500MFN.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+1770-ch-nch
+
+```{r}
+plt <- compile_res("06_tests/editions/mfn500/", ptrn = "^ed1770-ch-nch")
+
+mkplot(plt, "ed1770-ch-nch")
+
+ggsave(filename = "06_tests/editions/plots/ed1770-ch-nch_2k_500MFN.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+1770-nch-ch
+
+```{r}
+plt <- compile_res("06_tests/editions/mfn500/", ptrn = "^ed1770-nch-ch")
+
+mkplot(plt, "ed1770-nch-ch")
+
+ggsave(filename = "06_tests/editions/plots/ed1770-nch-ch_2k_500MFN.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+1770-ch-ch
+
+```{r}
+plt <- compile_res("06_tests/editions/mfn500/", ptrn = "^ed1770-ch-ch")
+
+mkplot(plt, "ed1770-ch-ch")
+
+ggsave(filename = "06_tests/editions/plots/ed1770-ch-ch_2k_500MFN.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+1774-nch
+
+```{r}
+plt <- compile_res("06_tests/editions/mfn500/", ptrn = "^ed1774-nch")
+
+mkplot(plt, "ed1774-nch")
+
+ggsave(filename = "06_tests/editions/plots/ed1774-nch_2k_500MFN.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+1774-ch
+
+```{r}
+plt <- compile_res("06_tests/editions/mfn500/", ptrn = "^ed1774-ch")
+
+mkplot(plt, "ed1774-ch")
+
+ggsave(filename = "06_tests/editions/plots/ed1774-ch_2k_500MFN.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
+```
+
+1780
+
+```{r}
+plt <- compile_res("06_tests/editions/mfn500/", ptrn = "^ed1780")
+
+mkplot(plt, "ed1780")
+
+ggsave(filename = "06_tests/editions/plots/ed1780_2k_500MFN.png", 
+       plot = last_plot(),
+       height = 20, width = 8, bg = "white")
 ```
