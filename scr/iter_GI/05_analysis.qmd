@@ -450,8 +450,6 @@ grep("ed", rownames(dtm))
 rownames(dtm)
 ```
 
-# to run
-
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
 op_list_w <- vector("list", 20)
 counter <- 0
@@ -569,8 +567,6 @@ imp_res %>%
 ```
 
 #### 1770-ch1774-ch1780
-
-# to run
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
 op_list_w <- vector("list", 20)
@@ -715,8 +711,6 @@ imp_res %>%
 #### 1770-nch1774-ch1780
 
 n words = 18 247
-
-# to run
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
 op_list_w <- vector("list", 20)
@@ -1003,8 +997,6 @@ imp_res %>%
 ```
 
 #### 1774-ch1780
-
-# to run
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
 op_list_w <- vector("list", 20)
@@ -1295,7 +1287,7 @@ imp_res %>%
 
 The Diderot's authorship of these fragments is unlikely for all groups of fragments at the moment.
 
-D'Holbach's signal is stronger in case of the earliest editions (1770 & not changed later), it weakens towards the 1780s edition.
+D'Holbach's signal is stronger in case of the earliest editions (1770 & not changed later), in cases of 1770-nch-nch, 1770-ch-nch & 1774-nch confidence interval proves that d'Holbach is the only robust and most frequent first candidate for the authorship.
 
 ## PART II. Pensées détachées vs Mélanges
 
@@ -1317,8 +1309,6 @@ pencil_ink_corpus %>%
 ### Imposters
 
 #### Pensées détachées (pencil)
-
-# to run
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
 op_list_w <- vector("list", 20)
@@ -1445,8 +1435,6 @@ imp_res %>%
 ```
 
 #### Mélanges (ink)
-
-# to run
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
 op_list_w <- vector("list", 20)
@@ -1604,7 +1592,7 @@ imp_res %>%
 
 ### Current conclusions
 
-It is unlikely that any of the selections (either in pencil or in ink) are Diderot's texts.
+It is unlikely that any of the selections (either in pencil or in ink) are Diderot's texts. However, our method is not sure about any of the authors to be the candidate for the authorship.
 
 ## PART III. 'Likely Diderot' fragments check
 
@@ -1715,8 +1703,6 @@ imp_res %>%
 ```
 
 #### Sauvage
-
-# to run
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE, echo=FALSE}
 op_list_w <- vector("list", 20)
@@ -1873,6 +1859,8 @@ imp_res %>%
 #       plot = last_plot(), dpi = 300, bg = "white",
 #       height = 5, width = 8)
 ```
+
+Although Diderot is the first among the authors being the closest to the target text, it is visible already from the boxplots, that the result on average is pretty low (\~0.4). CI confirms that the decision is far from being final.
 
 #### Selected fragments
 
