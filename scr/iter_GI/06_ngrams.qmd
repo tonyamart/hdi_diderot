@@ -499,6 +499,28 @@ for (i in 1:50) {
 saveRDS(imp_res, "imp_res/imp_res_FP_chars_mf500.rds")
 ```
 
+```{r}
+imp_res <- readRDS("imp_res/imp_res_FP_chars_mf500.rds")
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  #filter(candidate %in% c("Diderot", "Meister", "Condorcet", "dHolbach", "Deleyre")) %>% 
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772 (200 MF character 4-grams)",
+       x = "Top 5 candidates", y = "Proportion") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 10),
+        legend.position = "None"
+        )
+```
+
 # Problems
 
 ## load problems

@@ -399,7 +399,7 @@ Extract and plot results
 ```{r}
 # optimisation (CI lines)
 
-op_list_w <- readRDS("FP_optimise_list_w.rds")
+op_list_w <- readRDS("imp_res/FP_optimise_list_w.rds")
 
 min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
 max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
@@ -433,6 +433,9 @@ imp_res %>%
         legend.position = "None"
         )
 
+ggsave("plots/FP_4k_200mfw.png",
+        plot = last_plot(), dpi = 300, bg = "white",
+        height = 5, width = 7)
 
 # shorter version of the plot 
 imp_res %>%
@@ -456,9 +459,9 @@ imp_res %>%
         legend.position = "None"
         )
 
-ggsave("../plots_paper/fig_1-b.png",
-       plot = last_plot(), dpi = 300, bg = "white",
-       height = 5, width = 6)
+# ggsave("../plots_paper/fig_1-b.png",
+#        plot = last_plot(), dpi = 300, bg = "white",
+#        height = 5, width = 6)
 ```
 
 #### 2000 words samples
@@ -532,6 +535,9 @@ imp_res %>%
         legend.position = "None"
         )
 
+ggsave("plots/FP_2k_200mfw.png",
+        plot = last_plot(), dpi = 300, bg = "white",
+        height = 5, width = 7)
 ```
 
 nb: Results for smaller sample are worse.
