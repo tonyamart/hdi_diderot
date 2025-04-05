@@ -433,10 +433,148 @@ imp_res %>%
         legend.position = "None"
         )
 
-ggsave("plots/FP_4k_200mfw.png",
+ggsave("imp_res/00_bct-fp_plots/FP_4k_200mfw-all-authors.png",
         plot = last_plot(), dpi = 300, bg = "white",
         height = 5, width = 7)
 
+
+```
+
+#### w/o MMN 4k 200MFW
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE, include=FALSE}
+
+unique(fp_corpus$author)
+
+fp_corpus_s <- fp_corpus %>% 
+  filter(!author %in% c("Marmontel", "Meister", "Naigeon"))
+
+sample_independent_opt(tokenized_df = fp_corpus_s,
+  n_samples = 2,
+  sample_size = 4000)
+
+dtm <- diy_stylo(
+  folder = "corpus_sampled/",
+  mfw = 200,
+  drop_words = F)
+
+grep("FP", rownames(dtm))
+```
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+op_list_w <- vector("list", 20)
+counter <- 0
+
+for(i in 1:20) {
+
+  sample_independent_opt(fp_corpus_s,
+                     sample_size = 4000,
+                     text_var = "word",
+                     n_samples = 2)
+  
+  data <- diy_stylo(folder="corpus_sampled/", 
+                    mfw = 200, 
+                    feature = "w",
+                    n_gram = 1,
+                    drop_words = T)
+  
+  op_list_w[[i]] <- imposters.optimize(data[-c(13, 14),])
+  
+  # as it takes time, it's easier to understand how long processing takes
+  counter <- counter + 1
+  print(counter)
+
+}
+
+saveRDS(op_list_w, "imp_res/FP-main_optimise_list_w.rds")
+```
+
+```{r, message=FALSE, warning=FALSE, eval=FALSE}
+imp_res <- vector(mode = "list")
+r <- NULL
+counter <- 0
+
+for (i in 1:50) {
+  
+  # create samples for each trial
+  sample_independent_opt(
+    tokenized_df = fp_corpus_s, 
+    n_samples = 2, 
+    sample_size = 4000)
+  
+  # build doc-term matrix from the samples in the corpus_sampled folder
+  data = diy_stylo(mfw = 200, 
+                    feature = "word",
+                    n_gram = 1)
+  
+  # test each of the true FV-L1 sets
+  for (s in c(13, 14)) {
+    
+    # run imposters test
+    r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
+                   test = data[c(s),], # test one of the samples against the others
+                   features = 0.5, # test 50% of the features in each trial
+                   iterations = 100,
+                   distance = "wurzburg"
+                   )
+    
+    # count iterations
+    counter <- counter + 1
+    
+    # store results
+    
+    imp_res[[counter]] <- tibble(candidate = names(r),
+                                 proportion = r)
+    
+    print(counter)
+  }
+  
+}
+
+saveRDS(imp_res, "imp_res/imp_res_FP-main.rds")
+```
+
+```{r, echo=FALSE}
+op_list_w <- readRDS("imp_res/FP-main_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
+imp_res <- readRDS("imp_res/imp_res_FP-main.rds")
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  #filter(candidate %in% c("Diderot", "Meister", "Condorcet", "dHolbach", "Deleyre")) %>% 
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772",
+       x = "Top 5 candidates", y = "Proportion") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 10),
+        legend.position = "None"
+        )
+
+ggsave("imp_res/00_bct-fp_plots/FP_4k_200mfw.png",
+        plot = last_plot(), dpi = 300, bg = "white",
+        height = 5, width = 7)
+```
+
+### fig 1b
+
+```{r}
 # shorter version of the plot 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
@@ -528,14 +666,14 @@ imp_res %>%
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772",
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772 (2000 word samples, 200 MFW)",
        x = "Top 5 candidates", y = "Proportion") +
   theme(#axis.text.x = element_text(angle = 25)
         axis.text = element_text(size = 10),
         legend.position = "None"
         )
 
-ggsave("plots/FP_2k_200mfw.png",
+ggsave("imp_res/00_bct-fp_plots/FP_2k_200mfw.png",
         plot = last_plot(), dpi = 300, bg = "white",
         height = 5, width = 7)
 ```
