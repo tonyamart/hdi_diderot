@@ -16,7 +16,7 @@ E.g., for d’Holbach the following 5 works were selected: “Éléments de la m
 
 ![pic d’Holbach](https://github.com/tonyamart/hdi_diderot/blob/main/scr/iter_GI/imp_res/plots__authors_vs_all/dHolbach.png?raw=true)
 
-The results are rather good for the rest of the authors (Please find the pictures here in the [github folder]([https://github.com/tonyamart/hdi_diderot/tree/main/scr/iter_GI/imp_res/plots__authors_vs_all).
+The results are rather good for the rest of the authors (Please find the pictures here in the [github folder](https://github.com/tonyamart/hdi_diderot/tree/main/scr/iter_GI/imp_res/plots__authors_vs_all).
 
 However the most important one for us—Diderot—actually demonstrated some problematic attributions. 
 
@@ -36,12 +36,16 @@ Another issue is with Meister's authorial corpus, where we have only two very sh
 
 Seeing these issues found in “ground truth” testing, in the main experiment we have two selections of authors: one is the corpus without “trouble-makers” (Naigeon, Meister, Marmontel), and the second is with them. This way we can see if anything would change in our results depending on these three authors. After comparing the results of the experiments done with/without Naigeon, Meister, and Marmontel, we can confirm that there is no strong influence and our main conclusions stay the same in both cases (plots for main selection: folder [imp_res/0_plots_main](https://github.com/tonyamart/hdi_diderot/tree/main/scr/iter_GI/imp_res/0_plots_main), selection that includes Naigeon, Meister, and Marmontel: [imp_res/1_plots_additional](https://github.com/tonyamart/hdi_diderot/tree/main/scr/iter_GI/imp_res/1_plots_additional)).
 
-## Method II. BDI.
+## Method II. BDI
 
 In a similar way, the method was tested for the BDI. For selection of 5 authors (Diderot, d’Holbach, Baudeau, Condorcet, Raynal), 5 random works were taken and one work selected as a target (i.e., total 25 works in the corpus, not the whole selection — for time reasons). The algorithm was asked to show which authors are the closest to the problem (the distribution closer to the right side means better match). Here are results for d’Holbach and Diderot (rest of the results are in the [folder](https://github.com/tonyamart/hdi_diderot/tree/main/scr/bdi/03_tests/authors_vs_all/plots_5-authors)): 
 
-![bdi d’holbach](https://github.com/tonyamart/hdi_diderot/blob/main/scr/bdi/03_tests/authors_vs_all/plots_5-authors/dHolbach.png?raw=true)
+Finding the attribution for d'Holbach's works (one column -- one work tested against five authors).  
 
+![bdi d’holbach](https://github.com/tonyamart/hdi_diderot/blob/main/scr/bdi/03_tests/authors_vs_all/plots_5-authors/dHolbach.png?raw=true)
+  
+Finding the attribution for d'Holbach's works (one column -- one work tested against five authors).
+  
 ![bdi Diderot](https://github.com/tonyamart/hdi_diderot/blob/main/scr/bdi/03_tests/authors_vs_all/plots_5-authors/Diderot.png?raw=true)
 
 As in previous test, in some cases fragments from Diderot may be misattributed, but on average the distributions for his works are still by far more on the right sight then the others’. 
@@ -58,7 +62,7 @@ In case of Bootstrap consensus trees (word-based), we have *sometimes* results w
 
 In case of Iterative GI, Diderot is the closest author to FP in most of the cases. The dashed line shows the confidence interval, meaning that there is still some uncertainty suggested by the GI here.
 
-![pic FP]()
+![pic FP](https://github.com/tonyamart/hdi_diderot/blob/main/scr/iter_GI/imp_res/00_bct-fp_plots/FP_4k_200mfw.png?raw=true)
 Iterative GI results for FP, 2000 words samples, 200 MFW
 
 Not unexpectedly, the preciseness of the attribution is lower with lower number of words in a sample (cf.: [plot](https://github.com/tonyamart/hdi_diderot/blob/main/scr/iter_GI/imp_res/00_bct-fp_plots/FP_2k_200mfw.png?raw=true)).
