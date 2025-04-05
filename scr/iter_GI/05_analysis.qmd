@@ -1,6 +1,6 @@
 ---
 title: "03_analysis"
-format: html
+format: md
 editor: visual
 ---
 
@@ -251,6 +251,8 @@ ed_corpus <- rbind(corpus_tokenized, ed)
 
 #### 1770 unchanged
 
+n words = 11841
+
 ```{r, echo=FALSE}
 # var needed for diy fn
 str_dev_words <- c("changed")
@@ -389,9 +391,14 @@ imp_res %>%
   
   
   theme_bw() + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)", x = "Candidates", y = "Proportion") +
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)\nN words in problem text = 11841", x = "Candidates", y = "Proportion") +
   theme(axis.text.x = element_text(angle = 25))
+
+ggsave(filename = "imp_res/0_plots_main/1_ed1770-nch-nch.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
+
+### fig 2a
 
 ```{r}
 # short plot for the article
@@ -412,13 +419,13 @@ imp_res %>%
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)", x = "Candidates (top 7 + Diderot)", y = "Proportion") +
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)", x = "Candidates (top-7 + Diderot)", y = "Proportion") +
   theme(#axis.text.x = element_text(angle = 25)
         axis.text = element_text(size = 12),
         legend.position = "None"
         )
 
-ggsave("plots/fig_2-a.png",
+ggsave("../plots_paper/fig_2-a.png",
        plot = last_plot(), dpi = 300, bg = "white",
        height = 5, width = 8)
 ```
@@ -562,8 +569,11 @@ imp_res %>%
              linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed in the ed. of 1774 and not changed in the ed. of 1780 ", x = "") +
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed in the ed. of 1774 and not changed in the ed. of 1780\nN words in problem text = 5690", x = "") +
   theme(axis.text.x = element_text(angle = 25))
+
+ggsave(filename = "imp_res/0_plots_main/2_ed1770-ch-nch.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
 
 #### 1770-ch1774-ch1780
@@ -704,8 +714,11 @@ imp_res %>%
              linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed twice in the ed. of 1774 and that of 1780 ", x = "") +
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed twice in the ed. of 1774 and that of 1780\nN words in problem text = 16882", x = "") +
   theme(axis.text.x = element_text(angle = 25))
+
+ggsave(filename = "imp_res/0_plots_main/4_ed1770-ch-ch.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
 
 #### 1770-nch1774-ch1780
@@ -847,8 +860,11 @@ imp_res %>%
              linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was not changed in the ed. of 1774 and changed in the ed. of 1780", x = "") +
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was not changed in the ed. of 1774 and changed in the ed. of 1780\nN words in problem text = 18198", x = "") +
   theme(axis.text.x = element_text(angle = 25))
+
+ggsave(filename = "imp_res/0_plots_main/3_ed1770-nch-ch.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
 
 #### 1774-nch1780
@@ -990,10 +1006,13 @@ imp_res %>%
              linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and not changed in the ed. of 1780",
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and not changed in the ed. of 1780\nN words in problem text = 4804",
        x = "") +
   theme(axis.text.x = element_text(angle = 25,
                                    size = 12))
+
+ggsave(filename = "imp_res/0_plots_main/5_ed1774-nch.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
 
 #### 1774-ch1780
@@ -1135,9 +1154,12 @@ imp_res %>%
              linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and changed in the ed. of 1780",
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and changed in the ed. of 1780\nN words in problem text = 18373",
        x = "") +
   theme(axis.text.x = element_text(angle = 25))
+
+ggsave(filename = "imp_res/0_plots_main/6_ed1774-ch.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
 
 #### 1780
@@ -1279,8 +1301,11 @@ imp_res %>%
              linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1780", x = "") +
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1780\nN words in problem text = 86421", x = "") +
   theme(axis.text.x = element_text(angle = 25))
+
+ggsave(filename = "imp_res/0_plots_main/7_ed1774-nch.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
 
 ### Current conclusions
@@ -1432,6 +1457,9 @@ imp_res %>%
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Pensées détachées", x = "") +
   theme(axis.text.x = element_text(angle = 25))
+
+ggsave(filename = "imp_res/0_plots_main/8_pencil.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
 ```
 
 #### Mélanges (ink)
@@ -1559,7 +1587,13 @@ imp_res %>%
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Mélanges (ink)", x = "") +
   theme(axis.text.x = element_text(angle = 25))
 
+ggsave(filename = "imp_res/0_plots_main/9_ink.png", plot = last_plot(),
+       bg = "white", width = 8, height = 6)
+```
 
+### fig 3a
+
+```{r, echo=FALSE}
 
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one 
@@ -1831,6 +1865,12 @@ imp_res %>%
 
 
 
+
+```
+
+### fig 4a
+
+```{r, echo=FALSE}
 imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one 
   mutate(candidate = str_remove(candidate, "^/")) %>% 
@@ -2045,7 +2085,7 @@ ed_corpus <- rbind(corpus_tokenized, ed)
 
 Groups of fragments based on editorial history:
 
-```{r}
+```{r, echo=FALSE}
 titles <- unique(ed$author)
 titles
 ```
