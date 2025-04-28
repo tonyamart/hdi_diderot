@@ -812,8 +812,8 @@ new_data %>%
 
 ```{r}
 x <- new_data %>% 
-  mutate(group = str_remove_all(group, "03_tests/fp1/1000_words/mfw100//|\\.csv")) %>% 
-  filter(str_detect(group, "Baudeau|dHolbach|Diderot|Raynal")) 
+  mutate(group = str_remove_all(group, "03_tests/fp1/2000_words/mfw200//|\\.csv"))#%>% 
+ # filter(str_detect(group, "Baudeau|dHolbach|Diderot|Raynal")) 
 
 glimpse(x)
 
@@ -852,7 +852,9 @@ x %>%
   summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
   ungroup() %>% 
   group_by(group) %>% 
-  summarise(mean_above_0 = mean(perc_above_0))
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0))
 ```
 
 200 mfw
@@ -972,10 +974,11 @@ ggsave(filename = "03_tests/fp1/2000_words/fp1_2k_200MFW.png", plot = last_plot(
        height = 20, width = 8, bg = "white")
 
 
-new_data %>% 
+fig_1c <- new_data %>% 
   mutate(group = str_remove_all(group, "03_tests/fp1/2000_words/mfw200//|\\.csv")) %>% 
   filter(str_detect(group, "Diderot|dHolbach|Condorcet|Deleyre|Raynal")) %>% 
   mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  mutate(group = ifelse(group == "fp1_vs_dHolbach", "fp1_vs_d'Holbach", group)) %>% 
   ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
@@ -987,13 +990,31 @@ new_data %>%
   theme(legend.position = "None") + 
   labs(title = "FP vs selected authors (2000 words chunks, 200 MFW)",
        y = "") + 
-  theme(strip.text = element_text(size = 10))
+  theme(strip.text = element_text(size = 12))
 
-ggsave("../../hdi_diderot/scr/plots_paper/fig_1-c.png",
-       plot = last_plot(), dpi = 300, bg = "white",
+fig_1c
+
+ggsave("../plots_paper/fig_1-c.png",
+       plot = fig_1c, dpi = 300, bg = "white",
        height = 5, width = 6)
 
 rm(list = ls())
+```
+
+### Fig 1b+1c
+
+```{r}
+# fig 1b should exist!
+
+plot_grid(fig_1b, fig_1c, 
+          ncol = 2,
+          labels = c('B', 'C'),
+          label_size = 24,
+          rel_widths = c(2, 2))
+
+ggsave("../plots_paper/fig_1-bc.png",
+       bg = "white", dpi = 300,
+       height = 6, width = 10)
 ```
 
 # Known work vs all

@@ -1,7 +1,7 @@
 ## Authorship of HDI fragments (Fonds Vandeul)
   
 This repository contains supplementary materials to the paper ... on the authorship of of selected fragments from *Histoire de deux Indes*.  
-...
+  
 The corpus was compiled by Julian Csapo, the preprocessing and examination (code) done by Antonina Martynenko; pipeline for the tests by Artjoms Šeļa & AM.  
   
 [Corpus](##Corpus)  

@@ -588,16 +588,18 @@ plt <- compile_res("04_tests/tests/", ptrn = "^ed1770-nch-nch")
 
 mkplot(plt, "ed1770-nch-nch")
 
-ggsave(filename = "04_tests/plots/ed1770-nch-nch_2k_200MFW.png", 
-       plot = last_plot(),
-       height = 20, width = 8, bg = "white")
+# ggsave(filename = "04_tests/plots/ed1770-nch-nch_2k_200MFW.png", 
+#        plot = last_plot(),
+#        height = 20, width = 8, bg = "white")
 ```
 
 ```{r}
-plt %>% 
+fig_2b <- plt %>% 
   mutate(group = str_remove_all(group, "04_tests/tests//|\\.csv")) %>% 
   filter(str_detect(group, "Diderot|Rivière|Condorcet|dHolbach|Saint-Lambert|Meister|Deleyre|Pechmeja|Baudeau")) %>% 
   mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  mutate(group = ifelse(group == "ed1770-nch-nch_vs_dHolbach", "ed1770-nch-nch_vs_d'Holbach", group)) %>% 
+  mutate(group = ifelse(group == "ed1770-nch-nch_vs_Rivière", "ed1770-nch-nch_vs_La Rivière", group)) %>%
   ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
@@ -609,11 +611,42 @@ plt %>%
   theme(legend.position = "None") + 
   labs(title = "FP vs selected authors",
        y = "") + 
-  theme(strip.text = element_text(size = 12))
+  theme(strip.text = element_text(size = 12),
+        plot.subtitle = element_text(size = 14))
+
+fig_2b
 
 ggsave("../../hdi_diderot/scr/plots_paper/fig_2-b.png",
        plot = last_plot(), dpi = 300, bg = "white",
        height = 8, width = 6)
+```
+
+```{r}
+plot_grid(fig_2a, fig_2b, 
+          ncol = 2,
+          labels = c('A', 'B'),
+          label_size = 24,
+          rel_widths = c(4, 3))
+
+ggsave("../plots_paper/fig_2.png",
+       bg = "white", dpi = 300,
+       height = 8, width = 14)
+```
+
+mass above zero
+
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//ed1770-nch-nch_vs_|\\.csv")) %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0))
 ```
 
 #### ed1770-CH1774-nch1780

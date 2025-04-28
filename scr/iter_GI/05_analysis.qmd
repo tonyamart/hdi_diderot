@@ -401,12 +401,23 @@ ggsave(filename = "imp_res/0_plots_main/1_ed1770-nch-nch.png", plot = last_plot(
 ### fig 2a
 
 ```{r}
+imp_res <- readRDS("imp_res/0_main_res/impr_1770_nch74_nch80.rds")
+
+op_list_w <- readRDS("imp_res/0_main_res/ed1770-nch-nch_optimise_list_w.rds")
+
+min_mean_w <- map(op_list_w, 1) %>% unlist() %>% mean()
+max_mean_w <- map(op_list_w, 2) %>% unlist() %>% mean()
+
 # short plot for the article
-imp_res %>%
+fig_2a <- imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one 
-  mutate(candidate = str_remove(candidate, "^/")) %>% 
-  filter(candidate %in% c("Diderot", "Rivière", "Condorcet", "dHolbach", "Saint-Lambert", "Meister", "Deleyre", "Pechmeja", "Baudeau")) %>% 
+  mutate(candidate = str_remove(candidate, "^/")) %>%  
   mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  mutate(candidate = ifelse(candidate == "dHolbach", "d'Holbach", candidate)) %>% 
+  mutate(candidate = ifelse(candidate == "Rivière", "La Rivière", candidate)) %>%
+  
+  # filter top authors for the plot
+  filter(candidate %in% c("Diderot", "d'Holbach", "La Rivière", "Saint-Lambert", "Condorcet", "Deleyre", "Pechmeja", "Baudeau")) %>% 
   ggplot(aes(x = reorder(candidate, proportion),
   y = proportion)) + 
   geom_boxplot(aes(fill = gr)) + 
@@ -419,15 +430,31 @@ imp_res %>%
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)", x = "Candidates (top-7 + Diderot)", y = "Proportion") +
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)", x = "Candidates (top-7 + Diderot)", y = "Proportion\n(dashed line shows CI with results between the lines being uncertain)") +
   theme(#axis.text.x = element_text(angle = 25)
         axis.text = element_text(size = 12),
+        plot.subtitle = element_text(size = 14),
         legend.position = "None"
         )
+
+fig_2a
 
 ggsave("../plots_paper/fig_2-a.png",
        plot = last_plot(), dpi = 300, bg = "white",
        height = 5, width = 8)
+```
+
+```{r}
+mean_gi <- function(res) {
+  imp_res %>%
+  bind_rows() %>% 
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  group_by(candidate) %>% 
+  summarise(mean_GI = mean(proportion)) %>% 
+  arrange(desc(mean_GI))
+}
+
+mean_gi(imp_res)
 ```
 
 This is the strongest d'Holbach authorship signal obtained from this data, the algorithm is quite sure about his authorship for the FV fragments of the earliest fragments (appeared ed. 1770 and remained unchanged in later editions).

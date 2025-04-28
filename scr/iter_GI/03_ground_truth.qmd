@@ -575,13 +575,16 @@ ggsave("imp_res/00_bct-fp_plots/FP_4k_200mfw.png",
 ### fig 1b
 
 ```{r}
+imp_res <- readRDS("imp_res/imp_res_FP-main.rds")
+
 # shorter version of the plot 
-imp_res %>%
+fig_1b <- imp_res %>%
   bind_rows() %>%  #stack all the optained prop tables into one
   mutate(candidate = str_remove(candidate, "^/")) %>% 
   # filter top-5 authors from above (exept Marmontel)
   filter(candidate %in% c(
-    "Diderot", "Meister", "Condorcet", "Naigeon", "dHolbach")) %>% 
+    "Diderot", "Saint-Lambert", "Condorcet", "Deleyre", "dHolbach")) %>% 
+  mutate(candidate = ifelse(candidate == "dHolbach", "d'Holbach", candidate)) %>% 
   mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
   ggplot(aes(x = reorder(candidate, proportion),
   y = proportion)) + 
@@ -590,16 +593,28 @@ imp_res %>%
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
-  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FP 1772",
+  labs(subtitle = "Proportion of cases where a sample from an author \nwas the closest one to FP 1772",
        x = "Top 5 candidates", y = "Proportion") +
   theme(#axis.text.x = element_text(angle = 25)
-        axis.text = element_text(size = 10),
+        axis.text = element_text(size = 12),
         legend.position = "None"
         )
 
-# ggsave("../plots_paper/fig_1-b.png",
-#        plot = last_plot(), dpi = 300, bg = "white",
-#        height = 5, width = 6)
+fig_1b
+
+ggsave("../plots_paper/fig_1-b.png",
+       plot = fig_1b, dpi = 300, bg = "white",
+       height = 5, width = 6)
+```
+
+### table 3 - 0
+
+```{r}
+imp_res %>% bind_rows() %>%  #stack all the optained prop tables into one
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  group_by(candidate) %>% 
+  summarise(mean_GI = mean(proportion)) %>% 
+  arrange(desc(mean_GI))
 ```
 
 #### 2000 words samples
