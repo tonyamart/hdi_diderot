@@ -621,6 +621,8 @@ ggsave("../../hdi_diderot/scr/plots_paper/fig_2-b.png",
        height = 8, width = 6)
 ```
 
+### fig 2 (merged)
+
 ```{r}
 plot_grid(fig_2a, fig_2b, 
           ncol = 2,
@@ -665,6 +667,21 @@ ggsave(filename = "04_tests/plots/ed1770-CH-nch_2k_200MFW.png",
 mk_splot(plt, work = "ed1770-CH-nch", authors = "HDI|Diderot|Raynal|dHolbach")
 ```
 
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//ed1770-CH-nch_vs_|\\.csv")) %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0)) %>% 
+  head(5)
+```
+
 #### ed1770-nch1774-CH1780
 
 9 chunks
@@ -682,6 +699,23 @@ ggsave(filename = "04_tests/plots/ed1770-nch-CH_2k_200MFW.png",
 
 # short version of the plot
 mk_splot(plt, work = "ed1770-nch-CH", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+Mass above zero
+
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//ed1770-nch-CH_vs_|\\.csv")) %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0)) %>% 
+  head(5)
 ```
 
 #### ed1770-CH1774-CH1780
@@ -703,6 +737,22 @@ ggsave(filename = "04_tests/plots/ed1770-CH-CH_2k_200MFW.png",
 mk_splot(plt, work = "ed1770-CH-CH", authors = "HDI|Diderot|Raynal|dHolbach")
 ```
 
+```{r}
+# mass
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//ed1770-CH-CH_vs_|\\.csv")) %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0)) %>% 
+  head(5)
+```
+
 #### ed1774-nch1780
 
 2 chunks
@@ -720,6 +770,21 @@ ggsave(filename = "04_tests/plots/ed1774-nch_2k_200MFW.png",
 
 # short version of the plot
 mk_splot(plt, work = "ed1774-nch", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//ed1774-nch_vs_|\\.csv")) %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0)) %>% 
+  head(5)
 ```
 
 #### ed1774-CH1780
@@ -741,6 +806,21 @@ ggsave(filename = "04_tests/plots/ed1774-CH_2k_200MFW.png",
 mk_splot(plt, work = "ed1774-CH", authors = "HDI|Diderot|Raynal|dHolbach")
 ```
 
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//ed1774-CH_vs_|\\.csv")) %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0)) %>% 
+  head(5)
+```
+
 #### ed1780
 
 42 chunks
@@ -758,4 +838,19 @@ ggsave(filename = "04_tests/plots/ed1780_2k_200MFW.png",
 
 # short version of the plot
 mk_splot(plt, work = "ed1780", authors = "HDI|Diderot|Raynal|dHolbach")
+```
+
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//ed1780_vs_|\\.csv")) %>% 
+  # filter(group == "fp1_vs_Baudeau") %>% 
+  mutate(above_0 = bdi>0) %>%  
+  group_by(group, run) %>% 
+  summarise(perc_above_0 = (sum(above_0) / 1000) * 100) %>% 
+  ungroup() %>% 
+  group_by(group) %>% 
+  summarise(mean_above_0 = mean(perc_above_0)) %>% 
+  # arrange by top mean
+  arrange(desc(mean_above_0)) %>% 
+  head(5)
 ```

@@ -4,11 +4,7 @@ This repository contains supplementary materials to the paper ... on the authors
   
 The corpus was compiled by Julian Csapo, the preprocessing and examination (code) done by Antonina Martynenko; pipeline for the tests by Artjoms Šeļa & AM.  
   
-[Corpus](##Corpus)  
-[Methodology](##Methodology)  
-[FP-1772](##FP-1772)  
-[FV-Results](##FV-Results)  
-
+  
 ## Corpus
 ### Reference set
 The corpus as well as the metadata were prepared by Julian Csapo. Corpus metadata is stored as `data/corpus_metadata.csv`. The files in the corpus are presented as one file = one book.  
