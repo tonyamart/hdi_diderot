@@ -1353,8 +1353,38 @@ imp_res %>%
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1780\nN words in problem text = 86421", x = "") +
   theme(axis.text.x = element_text(angle = 25))
 
-# ggsave(filename = "imp_res/0_plots_main/7_ed1774-nch.png", plot = last_plot(),
-#        bg = "white", width = 8, height = 6)
+#ggsave(filename = "imp_res/0_plots_main/7_ed1780.png", plot = last_plot(),
+#       bg = "white", width = 8, height = 6)
+```
+
+```{r}
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one 
+  mutate(candidate = str_remove(candidate, "^/")) %>%  
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  mutate(candidate = ifelse(candidate == "dHolbach", "d'Holbach", candidate)) %>% 
+  mutate(candidate = ifelse(candidate == "Rivière", "La Rivière", candidate)) %>%
+  
+  # filter top authors for the plot
+  filter(candidate %in% c("Diderot", "d'Holbach", "La Rivière", "Saint-Lambert", "Condorcet", "Morellet", "Pechmeja", "Baudeau")) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1780", x = "Candidates (top-7 + Diderot)", y = "Proportion\n(dashed line shows CI with results between the lines being uncertain)") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 12),
+        plot.subtitle = element_text(size = 14),
+        legend.position = "None"
+        )
 ```
 
 ```{r}
@@ -1513,6 +1543,33 @@ imp_res %>%
 
 # ggsave(filename = "imp_res/0_plots_main/8_pencil.png", plot = last_plot(),
 #        bg = "white", width = 8, height = 6)
+
+imp_res %>%
+  bind_rows() %>%  #stack all the optained prop tables into one 
+  mutate(candidate = str_remove(candidate, "^/")) %>% 
+  filter(candidate %in% c("Diderot", "Saint-Lambert", "Pechmeja", "Condorcet", "dHolbach", "Baudeau", "Deleyre",  "Rivière")) %>% 
+  mutate(gr = ifelse(candidate == "Diderot", "d", "no")) %>% 
+  mutate(candidate = ifelse(candidate == "Rivière", "La Rivière", candidate)) %>%
+  mutate(candidate = ifelse(candidate == "dHolbach", "d'Holbach", candidate)) %>% 
+  ggplot(aes(x = reorder(candidate, proportion),
+  y = proportion)) + 
+  geom_boxplot(aes(fill = gr)) + 
+  
+  # opt lines
+  geom_hline(aes(yintercept = min_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  geom_hline(aes(yintercept = max_mean_w),
+             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  
+  theme_bw() + 
+  coord_flip() + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  labs(subtitle = "Proportion of cases where a sample from an author \nwas the closest one to FV texts from Pensées détachées (pencil)", x = "Candidates (selected)", y = "Proportion\n(dashed line shows CI with results between the lines being uncertain)") +
+  theme(#axis.text.x = element_text(angle = 25)
+        axis.text = element_text(size = 12),
+        plot.subtitle = element_text(size = 16),
+        legend.position = "None"
+        )
 ```
 
 ```{r}

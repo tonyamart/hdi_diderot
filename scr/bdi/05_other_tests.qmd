@@ -415,6 +415,28 @@ plt %>%
   head(5)
 ```
 
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "05_tests/tests//|\\.csv")) %>% 
+  filter(str_detect(group, "Diderot|Rivière|Condorcet|dHolbach|Saint-Lambert|Deleyre|Pechmeja|Baudeau")) %>% 
+  mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  mutate(group = ifelse(group == "pencil_vs_dHolbach", "pencil_vs_d'Holbach", group)) %>% 
+  mutate(group = ifelse(group == "pencil_vs_Rivière", "pencil_vs_La Rivière", group)) %>%
+  ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  
+  scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "Pencil vs selected authors",
+       y = "") + 
+  theme(strip.text = element_text(size = 12),
+        plot.subtitle = element_text(size = 14))
+```
+
 ### ink
 
 ```{r}
@@ -441,7 +463,7 @@ plt %>%
   summarise(mean_above_0 = mean(perc_above_0)) %>% 
   # arrange by top mean
   arrange(desc(mean_above_0)) %>% 
-  head(5)
+  head(10)
 ```
 
 ### fig 3b
@@ -450,10 +472,10 @@ plt %>%
 # short version of the plot
 fig_3b <- plt %>% 
   mutate(group = str_remove_all(group, "05_tests/tests//|\\.csv")) %>% 
-  filter(str_detect(group, "Diderot|Rivière|Condorcet|dHolbach|Saint-Lambert|Deleyre|Pechmeja|Baudeau")) %>% 
+  filter(str_detect(group, "Condorcet|Diderot|dHolbach|Deleyre|Chastellux|Marmontel|Saint-Lambert|Raynal")) %>% 
   mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
   mutate(group = ifelse(group == "ink_vs_dHolbach", "ink_vs_d'Holbach", group)) %>% 
-  mutate(group = ifelse(str_detect(group, "Rivi"), "ink_vs_La Rivière", group)) %>% 
+  #mutate(group = ifelse(str_detect(group, "Rivi"), "ink_vs_La Rivière", group)) %>% 
   ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
@@ -461,18 +483,27 @@ fig_3b <- plt %>%
   scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
   #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
-  facet_wrap(~group, ncol=1) + 
+  facet_wrap(~factor(group, levels = c("ink_vs_Condorcet",
+                                       "ink_vs_Diderot",
+                                       "ink_vs_d'Holbach",
+                                       "ink_vs_Deleyre",
+                                       "ink_vs_Chastellux",
+                                       "ink_vs_Marmontel",
+                                       "ink_vs_Saint-Lambert",
+                                       "ink_vs_Raynal")), 
+             ncol=1) + 
   theme(legend.position = "None") + 
-  labs(title = "Mélanges (ink) vs selected authors",
-       y = "") + 
+  labs(title = "   Mélanges (ink) vs selected authors (top BDI results)",
+       y = "", x = "BDI") + 
   theme(strip.text = element_text(size = 12),
-        plot.title = element_text(size = 16))
+        plot.title = element_text(size = 16),
+        axis.text.y = element_blank())
 
 fig_3b
 
-ggsave("../../hdi_diderot/scr/plots_paper/fig_3-b.png",
-       plot = last_plot(), dpi = 300, bg = "white",
-       height = 8, width = 6)
+# ggsave("../../hdi_diderot/scr/plots_paper/fig_3-b.png",
+#        plot = last_plot(), dpi = 300, bg = "white",
+#        height = 8, width = 6)
 ```
 
 ## fig 3 (merge)
@@ -521,7 +552,7 @@ plt %>%
   summarise(mean_above_0 = mean(perc_above_0)) %>% 
   # arrange by top mean
   arrange(desc(mean_above_0)) %>% 
-  head(5)
+  head(8)
 ```
 
 ### fig 4b
@@ -530,10 +561,10 @@ plt %>%
 # short version of the plot
 fig_4b <- plt %>% 
   mutate(group = str_remove_all(group, "05_tests/tests//|\\.csv")) %>% 
-  filter(str_detect(group, "Diderot|Pechmeja|Morellet|Rivière|Condorcet|dHolbach|Saint-Lambert|Baudeau")) %>% 
+  filter(str_detect(group, "Diderot|Condorcet|Deleyre|Chastellux|Guibert|Marmontel|Morellet|Saint-Lambert")) %>% 
   mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
   mutate(group = ifelse(group == "sauvage_vs_dHolbach", "sauvage_vs_d'Holbach", group)) %>% 
-  mutate(group = ifelse(str_detect(group, "Rivi"), "sauvage_vs_La Rivière", group)) %>% 
+  #mutate(group = ifelse(str_detect(group, "Rivi"), "sauvage_vs_La Rivière", group)) %>% 
   ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
   geom_density(alpha = 0.5) + 
   geom_vline(xintercept=0, lty = 2, colour = "black") + 
@@ -541,12 +572,21 @@ fig_4b <- plt %>%
   scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
   #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
-  facet_wrap(~group, ncol=1) + 
+  facet_wrap(~factor(group, levels = c("sauvage_vs_Diderot",
+                                       "sauvage_vs_Condorcet",
+                                       "sauvage_vs_Deleyre",
+                                       "sauvage_vs_Chastellux",
+                                       "sauvage_vs_Guibert",
+                                       "sauvage_vs_Marmontel",
+                                       "sauvage_vs_Morellet",
+                                       "sauvage_vs_Saint-Lambert")), 
+             ncol=1) + 
   theme(legend.position = "None") + 
-  labs(title = "'Sauvage' fragment vs selected authors",
-       y = "") + 
+  labs(title = "   'Sauvage' fragment vs selected authors (top BDI results)",
+       y = "", x = "BDI") + 
   theme(strip.text = element_text(size = 12),
-        plot.title = element_text(size = 16))
+        plot.title = element_text(size = 16),
+        axis.text.y = element_blank())
 
 fig_4b
 

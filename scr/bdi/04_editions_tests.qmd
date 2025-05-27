@@ -596,7 +596,7 @@ mkplot(plt, "ed1770-nch-nch")
 ```{r}
 fig_2b <- plt %>% 
   mutate(group = str_remove_all(group, "04_tests/tests//|\\.csv")) %>% 
-  filter(str_detect(group, "Diderot|Rivière|Condorcet|dHolbach|Saint-Lambert|Meister|Deleyre|Pechmeja|Baudeau")) %>% 
+  filter(str_detect(group, "Diderot|Condorcet|dHolbach|Saint-Lambert|Chastellux|Deleyre|Marmontel|Baudeau")) %>% 
   mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
   mutate(group = ifelse(group == "ed1770-nch-nch_vs_dHolbach", "ed1770-nch-nch_vs_d'Holbach", group)) %>% 
   mutate(group = ifelse(group == "ed1770-nch-nch_vs_Rivière", "ed1770-nch-nch_vs_La Rivière", group)) %>%
@@ -607,12 +607,21 @@ fig_2b <- plt %>%
   scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
   #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
-  facet_wrap(~group, ncol=1) + 
+  facet_wrap(~factor(group, levels = c("ed1770-nch-nch_vs_d'Holbach",
+                                       "ed1770-nch-nch_vs_Condorcet",
+                                       "ed1770-nch-nch_vs_Deleyre",
+                                       "ed1770-nch-nch_vs_Diderot",
+                                       "ed1770-nch-nch_vs_Chastellux",
+                                       "ed1770-nch-nch_vs_Saint-Lambert",
+                                       "ed1770-nch-nch_vs_Marmontel",
+                                       "ed1770-nch-nch_vs_Baudeau")), 
+             ncol=1) + 
   theme(legend.position = "None") + 
-  labs(title = "FP vs selected authors",
-       y = "") + 
+  labs(title = "    FP vs selected authors (top BDI results)",
+       y = "", x = "BDI") + 
   theme(strip.text = element_text(size = 12),
-        plot.subtitle = element_text(size = 14))
+        plot.subtitle = element_text(size = 14),
+        axis.text.y = element_blank())
 
 fig_2b
 
@@ -853,4 +862,26 @@ plt %>%
   # arrange by top mean
   arrange(desc(mean_above_0)) %>% 
   head(5)
+```
+
+```{r}
+plt %>% 
+  mutate(group = str_remove_all(group, "04_tests/tests//|\\.csv")) %>% 
+  filter(str_detect(group, "Diderot|Rivière|Condorcet|dHolbach|Saint-Lambert|Morelet|Pechmeja|Baudeau")) %>% 
+  mutate(gr = ifelse(str_detect(group, "Diderot"), "d", "no")) %>% 
+  mutate(group = ifelse(group == "ed1780_vs_dHolbach", "ed1780_vs_d'Holbach", group)) %>% 
+  mutate(group = ifelse(group == "ed1780_vs_Rivière", "ed1780_vs_La Rivière", group)) %>%
+  ggplot(aes(x = bdi, group = run, colour = gr, fill = gr)) + 
+  geom_density(alpha = 0.5) + 
+  geom_vline(xintercept=0, lty = 2, colour = "black") + 
+  
+  scale_color_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
+  #geom_vline(xintercept=0.1, lty = 2, colour = "black") + 
+  facet_wrap(~group, ncol=1) + 
+  theme(legend.position = "None") + 
+  labs(title = "ed1780 vs selected authors",
+       y = "") + 
+  theme(strip.text = element_text(size = 12),
+        plot.subtitle = element_text(size = 14))
 ```
