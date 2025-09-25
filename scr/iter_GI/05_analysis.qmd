@@ -98,7 +98,7 @@ diderot %>%
 
 ### load corpus
 
-Test corpus is the same as before in Julian's latest tests.
+Load prepared data
 
 ```{r, include=FALSE, echo=FALSE}
 corpus <- readRDS("../../data/corpus_tokenized.rds")
@@ -217,7 +217,7 @@ Bind corpus & test fragments together.
 
 The fragments were selected as follows:
 
--   using the metadata compiled by Julian, there are three tags for each fragment
+-   using the metadata compiled, there are three tags for each fragment
 
     -   1770 edition: appeared / not appeared
 
@@ -276,7 +276,7 @@ dtm <- diy_stylo(
   mfw = 200,
   drop_words = F)
 
-grep("ed", rownames(dtm))
+grep("ed", rownames(dtm)) # check the position of texts in question
 ```
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE}
@@ -347,7 +347,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -369,7 +369,7 @@ saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_nch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/0_main_res/impr_1770_nch74_nch80.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1770_nch74_nch80__33.rds")
 
 op_list_w <- readRDS("imp_res/0_main_res/ed1770-nch-nch_optimise_list_w.rds")
 
@@ -383,12 +383,12 @@ imp_res %>%
   y = proportion)) +
   geom_boxplot(fill = "darkcyan", alpha = 0.6) +
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that stayed unchanged in later editions (1774 & 1780)\nN words in problem text = 11841", x = "Candidates", y = "Proportion") +
@@ -554,7 +554,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -572,7 +572,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_nch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_nch80__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -591,12 +591,12 @@ imp_res %>%
   y = proportion)) +
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed in the ed. of 1774 and not changed in the ed. of 1780\nN words in problem text = 5690", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -703,7 +703,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -721,7 +721,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_ch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_ch80__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -741,11 +741,11 @@ imp_res %>%
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
   # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was changed twice in the ed. of 1774 and that of 1780\nN words in problem text = 16882", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -853,7 +853,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -871,7 +871,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_ch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_ch80__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -890,12 +890,12 @@ imp_res %>%
   y = proportion)) +
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from 1770 that was not changed in the ed. of 1774 and changed in the ed. of 1780\nN words in problem text = 18198", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -1002,7 +1002,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1020,7 +1020,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1774_nch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1774_nch80__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1040,12 +1040,12 @@ imp_res %>%
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and not changed in the ed. of 1780\nN words in problem text = 4804",
        x = "") +
@@ -1154,7 +1154,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1172,7 +1172,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1774_ch80.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1774_ch80__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1192,12 +1192,12 @@ imp_res %>%
   y = proportion)) +
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1774 and changed in the ed. of 1780\nN words in problem text = 18373",
        x = "") +
@@ -1305,7 +1305,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1323,7 +1323,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1780.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1780__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1343,12 +1343,12 @@ imp_res %>%
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV text from the ed. of 1780\nN words in problem text = 86421", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -1370,6 +1370,7 @@ imp_res %>%
   ggplot(aes(x = reorder(candidate, proportion),
   y = proportion)) + 
   geom_boxplot(aes(fill = gr)) + 
+  
   # opt lines
   geom_hline(aes(yintercept = min_mean_w),
              linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
@@ -1494,7 +1495,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(25, 26),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1512,7 +1513,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_pencil.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_pencil_33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1531,11 +1532,11 @@ imp_res %>%
   y = proportion)) +
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Pensées détachées", x = "") +
@@ -1654,7 +1655,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(15, 16),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1672,7 +1673,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_ink.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_ink__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1692,10 +1693,10 @@ imp_res %>%
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
   # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
   
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto FV texts from Mélanges (ink)", x = "") +
@@ -1939,7 +1940,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.5, # test 50% of the features in each trial
+                   features = 0.33, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1957,7 +1958,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_sauvage.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_sauvage__33.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1976,12 +1977,12 @@ imp_res %>%
   y = proportion)) +
   geom_boxplot(fill = "darkcyan", alpha = 0.6) + 
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   labs(subtitle = "Proportion of cases where a sample from an author was the closest one\nto the fragment 'Les avantages de la vie sauvage'", x = "") +
   theme(axis.text.x = element_text(angle = 25))
@@ -2009,12 +2010,12 @@ fig_4a <- imp_res %>%
   y = proportion)) + 
   geom_boxplot(aes(fill = gr)) + 
   
-  # opt lines
-  geom_hline(aes(yintercept = min_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  geom_hline(aes(yintercept = max_mean_w),
-             linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
-  
+  # # opt lines
+  # geom_hline(aes(yintercept = min_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # geom_hline(aes(yintercept = max_mean_w),
+  #            linewidth = 0.8,linetype = 5,color = met.brewer("Kandinsky")[1]) +
+  # 
   theme_bw() + 
   coord_flip() + 
   scale_fill_manual(values = met.brewer("Kandinsky")[2:4]) + 
