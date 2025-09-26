@@ -347,7 +347,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -369,7 +369,7 @@ saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_nch80.rds")
 ```
 
 ```{r, echo=FALSE}
-imp_res <- readRDS("imp_res/0_main_res/impr_1770_nch74_nch80__33.rds")
+imp_res <- readRDS("imp_res/0_main_res/impr_1770_nch74_nch80.rds")
 
 op_list_w <- readRDS("imp_res/0_main_res/ed1770-nch-nch_optimise_list_w.rds")
 
@@ -554,7 +554,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -572,7 +572,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_nch80__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_nch80.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -703,7 +703,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -721,7 +721,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_ch80__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_ch74_ch80.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -853,7 +853,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -871,7 +871,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_ch80__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1770_nch74_ch80.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1002,7 +1002,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1020,7 +1020,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1774_nch80__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1774_nch80.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1154,7 +1154,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1172,7 +1172,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1774_ch80__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1774_ch80.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1305,7 +1305,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1323,7 +1323,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_1780__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_1780.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1495,7 +1495,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(25, 26),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1513,7 +1513,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_pencil_33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_pencil.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1655,7 +1655,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(15, 16),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1673,7 +1673,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_ink__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_ink.rds")
 ```
 
 ```{r, echo=FALSE}
@@ -1940,7 +1940,7 @@ for (i in 1:50) {
     # run imposters test
     r <- imposters(reference.set = data[-c(13, 14),], # remove test data from the ref
                    test = data[c(s),], # test one of the samples against the others
-                   features = 0.33, # test 50% of the features in each trial
+                   features = 0.5, # test 50% of the features in each trial
                    iterations = 100,
                    distance = "wurzburg"
                    )
@@ -1958,7 +1958,7 @@ for (i in 1:50) {
   
 }
 
-saveRDS(imp_res, "imp_res/0_main_res/impr_sauvage__33.rds")
+saveRDS(imp_res, "imp_res/0_main_res/impr_sauvage.rds")
 ```
 
 ```{r, echo=FALSE}
